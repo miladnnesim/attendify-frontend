@@ -9,7 +9,7 @@ services:
       - ./wp-content:/var/www/html/wp-content
       - ./.docker/uploads:/var/www/html/wp-content/uploads
     environment:
-      - WORDPRESS_DB_HOST=${LOCAL_DB_HOST} # 🔥 Hier pakken we de variabelen uit .env
+      - WORDPRESS_DB_HOST=${LOCAL_DB_HOST} #  tijdelijk lokale MySQL container
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
       - WORDPRESS_DB_PASSWORD=${LOCAL_DB_PASSWORD}
       - WORDPRESS_DB_NAME=${LOCAL_DB_NAME}
@@ -23,3 +23,21 @@ services:
       - MYSQL_DATABASE=${LOCAL_DB_NAME}
     volumes:
       - ./.docker/mysql-data:/var/lib/mysql
+#
+#version: '3.8'
+
+#services:
+#  wordpress:
+#    image: wordpress:latest
+#    ports:
+#      - "8000:80"
+#    volumes:
+#      - ./wp-content:/var/www/html/wp-content
+#      - ./.docker/uploads:/var/www/html/wp-content/uploads
+#    environment:
+#      - WORDPRESS_DB_HOST=${DB_HOST}
+#      - WORDPRESS_DB_USER=${DB_USER}
+#      - WORDPRESS_DB_PASSWORD=${DB_PASSWORD}
+#      - WORDPRESS_DB_NAME=${DB_NAME}
+#      - WORDPRESS_TABLE_PREFIX=wp_
+#      - WORDPRESS_DEBUG=1
