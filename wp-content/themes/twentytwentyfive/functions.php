@@ -156,3 +156,113 @@ if ( ! function_exists( 'twentytwentyfive_format_binding' ) ) :
 		}
 	}
 endif;
+
+// Voeg een nieuwe tab toe aan de accountpagina
+add_filter('um_account_page_default_tabs_hook', 'add_extra_info_tab', 100);
+function add_extra_info_tab($tabs) {
+    $tabs[150]['extra_info'] = array(
+        'name' => 'Extra Informatie',
+        'title' => 'Extra Informatie', // Expliciet title toevoegen
+        'icon' => 'um-faicon-info-circle',
+        'custom' => true
+    );
+    return $tabs;
+}
+
+// Voeg inhoud toe aan de nieuwe tab
+add_filter('um_account_content_hook_extra_info', 'um_account_content_hook_extra_info', 10, 2);
+function um_account_content_hook_extra_info($output, $tab_id) {
+    // Haal het ID van het "Default Registration" formulier op
+    $register_form_id = 6; // Pas dit aan als het ID van jouw registratieformulier anders is
+
+    // Haal de velden van het registratieformulier op
+    $form_fields = get_post_meta($register_form_id, '_um_custom_fields', true);
+
+    // Debug: Controleer of de velden correct worden opgehaald
+    if (empty($form_fields) || !is_array($form_fields)) {
+        $output .= '<p>Fout: Geen velden gevonden in het registratieformulier. Controleer het formulier-ID.</p>';
+        return $output;
+    }
+
+    $fields_displayed = false;
+    $fields = array();
+
+    // Haal de huidige gebruiker op
+    $user_id = get_current_user_id();
+
+    // Loop door de velden en bereid ze voor om te renderen
+    foreach ($form_fields as $key => $field) {
+        if (isset($field['editable']) && $field['editable'] == 1) {
+            $meta_key = isset($field['metakey']) ? $field['metakey'] : $key;
+
+            // Sla standaardvelden over die al door UM worden afgehandeld
+            $default_fields = array('user_login', 'user_email', 'user_password', 'first_name', 'last_name', 'description');
+            if (in_array($meta_key, $default_fields)) {
+                continue;
+            }
+
+            $fields_displayed = true;
+
+            // Haal de huidige waarde van het veld op
+            $value = get_user_meta($user_id, $meta_key, true);
+
+            // Bereid de veldgegevens voor om te renderen met UM's eigen functie
+            $fields[$meta_key] = array(
+                'title' => isset($field['title']) ? $field['title'] : ucfirst(str_replace('_', ' ', $meta_key)),
+                'metakey' => $meta_key,
+                'type' => isset($field['type']) ? $field['type'] : 'text',
+                'label' => isset($field['title']) ? $field['title'] : ucfirst(str_replace('_', ' ', $meta_key)),
+                'value' => $value,
+                'options' => isset($field['options']) ? $field['options'] : array(),
+            );
+        }
+    }
+
+    // Start de output
+    ob_start();
+    ?>
+    <div class="um-form">
+        <?php
+        if (!$fields_displayed) {
+            echo '<p>Geen bewerkbare velden gevonden in het registratieformulier.</p>';
+        } else {
+            // Render de velden met UM's eigen functie
+            foreach ($fields as $key => $data) {
+                echo UM()->fields()->edit_field($key, $data);
+            }
+        }
+        ?>
+    </div>
+    <?php
+    $output .= ob_get_clean();
+    return $output;
+}
+
+// Sla de extra velden op wanneer de gebruiker de accountpagina bijwerkt
+add_action('um_account_pre_update_profile', 'save_custom_fields_in_account', 10, 2);
+function save_custom_fields_in_account($changes, $user_id) {
+    $register_form_id = 6;
+    $form_fields = get_post_meta($register_form_id, '_um_custom_fields', true);
+
+    if (!empty($form_fields) && is_array($form_fields)) {
+        foreach ($form_fields as $key => $field) {
+            if (isset($field['editable']) && $field['editable'] == 1) {
+                $meta_key = isset($field['metakey']) ? $field['metakey'] : $key;
+                $default_fields = array('user_login', 'user_email', 'user_password', 'first_name', 'last_name', 'description');
+                if (in_array($meta_key, $default_fields)) {
+                    continue;
+                }
+
+                if (isset($_POST[$meta_key])) {
+                    $value = $_POST[$meta_key];
+                    if (is_array($value)) {
+                        $value = array_map('sanitize_text_field', $value);
+                    } else {
+                        $value = sanitize_text_field($value);
+                    }
+                    update_user_meta($user_id, $meta_key, $value);
+                }
+            }
+        }
+    }
+}

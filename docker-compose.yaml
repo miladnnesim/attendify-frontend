@@ -9,7 +9,7 @@ services:
       - ./wp-content:/var/www/html/wp-content
       - ./.docker/uploads:/var/www/html/wp-content/uploads
     environment:
-      - WORDPRESS_DB_HOST=${LOCAL_DB_HOST} #  tijdelijk lokale MySQL container
+      - WORDPRESS_DB_HOST=${LOCAL_DB_HOST} # tijdelijk lokale MySQL container
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
       - WORDPRESS_DB_PASSWORD=${LOCAL_DB_PASSWORD}
       - WORDPRESS_DB_NAME=${LOCAL_DB_NAME}
@@ -23,6 +23,16 @@ services:
       - MYSQL_DATABASE=${LOCAL_DB_NAME}
     volumes:
       - ./.docker/mysql-data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=db
+      - PMA_USER=${LOCAL_DB_USER}
+      - PMA_PASSWORD=${LOCAL_DB_PASSWORD}
+      - PMA_ARBITRARY=1
 #
 #version: '3.8'
 
