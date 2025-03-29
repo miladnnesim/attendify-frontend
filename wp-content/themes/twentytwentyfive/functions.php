@@ -8,7 +8,8 @@
  * @subpackage Twenty_Twenty_Five
  * @since Twenty Twenty-Five 1.0
  */
-require_once ABSPATH . 'rabbitmq/producer.php';
+require_once ABSPATH . '/rabbitmq/producer.php';
+
 
 // Adds theme support for post formats.
 if ( ! function_exists( 'twentytwentyfive_post_format_setup' ) ) :
@@ -290,6 +291,7 @@ function send_user_data_to_rabbitmq_update($user_id, $old_data) {
     }
 }
 add_action('profile_update', 'send_user_data_to_rabbitmq_update', 10, 2);
+
 
 
 
