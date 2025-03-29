@@ -2,3 +2,4 @@
 .docker/
 full-db-export.sql
 /vendor
+/attendify-rabbitmq/vendor
