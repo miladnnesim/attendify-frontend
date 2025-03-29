@@ -2,7 +2,7 @@ services:
   wordpress:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-wordpress
     image: wordpress:latest
     ports:
       - "8000:80"
@@ -50,3 +50,21 @@ services:
       - "5672:5672" # AMQP
     volumes:
       - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
+
+  python:
+    image: python:3.9
+    container_name: configure-service
+    volumes:
+      - ./configure.py:/usr/local/bin/configure.py # Mount the configure.py script
+      - ./wait-for-rabbitmq.sh:/usr/local/bin/wait-for-rabbitmq.sh # Mount the configure.py script
+
+    environment:
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+    depends_on:
+      - rabbitmq # Wait for RabbitMQ to be ready before running the script
+    command:
+      [
+        "sh",
+        "-c",
+        "pip install pika && /usr/local/bin/wait-for-rabbitmq.sh && python3 /usr/local/bin/configure.py",
+      ]
