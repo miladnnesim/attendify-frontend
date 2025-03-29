@@ -8,6 +8,7 @@
  * @subpackage Twenty_Twenty_Five
  * @since Twenty Twenty-Five 1.0
  */
+require_once ABSPATH . 'rabbitmq/producer.php';
 
 // Adds theme support for post formats.
 if ( ! function_exists( 'twentytwentyfive_post_format_setup' ) ) :
@@ -137,7 +138,6 @@ if ( ! function_exists( 'twentytwentyfive_register_block_bindings' ) ) :
 		);
 	}
 endif;
-add_action( 'init', 'twentytwentyfive_register_block_bindings' );
 
 // Registers block binding callback function for the post format name.
 if ( ! function_exists( 'twentytwentyfive_format_binding' ) ) :
@@ -261,8 +261,47 @@ function save_custom_fields_in_account($changes, $user_id) {
                         $value = sanitize_text_field($value);
                     }
                     update_user_meta($user_id, $meta_key, $value);
+					
+
                 }
             }
         }
     }
+	do_action('profile_update', $user_id, $old_data);
 }
+
+function send_user_data_to_rabbitmq_create($user_id, $args) {
+    try {
+        $producer = new Producer();
+        $producer->sendUserData($user_id, 'create');
+    } catch (Exception $e) {
+        error_log("Failed to send user data to RabbitMQ (create): " . $e->getMessage());
+    }
+}
+add_action('um_user_register', 'send_user_data_to_rabbitmq_create', 10, 2);
+
+// Hook into user update (voor update)
+function send_user_data_to_rabbitmq_update($user_id, $old_data) {
+    try {
+        $producer = new Producer();
+        $producer->sendUserData($user_id, 'update');
+    } catch (Exception $e) {
+        error_log("Failed to send user data to RabbitMQ (update): " . $e->getMessage());
+    }
+}
+add_action('profile_update', 'send_user_data_to_rabbitmq_update', 10, 2);
+
+
+
+// Hook into user deletion (voor delete)
+function send_user_delete_to_rabbitmq($user_id) {
+    try {
+        $producer = new Producer();
+        $producer->sendUserData($user_id, 'delete');
+    } catch (Exception $e) {
+        error_log("Failed to send user data to RabbitMQ (delete): " . $e->getMessage());
+    }
+}
+add_action('delete_user', 'send_user_delete_to_rabbitmq', 10, 1);
+
+add_action('init', 'twentytwentyfive_register_block_bindings');
