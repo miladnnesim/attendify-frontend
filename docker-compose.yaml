@@ -42,9 +42,9 @@ services:
     container_name: some-rabbit
     restart: always
     environment:
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-      RABBITMQ_DEFAULT_USER: attendify
-      RABBITMQ_DEFAULT_VHOST: attendify
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_DEFAULT_USER=attendify
+      - RABBITMQ_DEFAULT_VHOST=attendify
     ports:
       - "15672:15672" # RabbitMQ Management Plugin
       - "5672:5672" # AMQP
@@ -55,16 +55,32 @@ services:
     image: python:3.9
     container_name: configure-service
     volumes:
-      - ./configure.py:/usr/local/bin/configure.py # Mount the configure.py script
-      - ./wait-for-rabbitmq.sh:/usr/local/bin/wait-for-rabbitmq.sh # Mount the configure.py script
-
+      - ./configure.py:/usr/local/bin/configure.py
+      - ./wait-for-rabbitmq.sh:/usr/local/bin/wait-for-rabbitmq.sh
     environment:
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
     depends_on:
-      - rabbitmq # Wait for RabbitMQ to be ready before running the script
+      - rabbitmq
     command:
-      [
-        "sh",
-        "-c",
-        "pip install pika && /usr/local/bin/wait-for-rabbitmq.sh && python3 /usr/local/bin/configure.py",
-      ]
+      - "sh"
+      - "-c"
+      - "pip install pika && /usr/local/bin/wait-for-rabbitmq.sh && python3 /usr/local/bin/configure.py"
+  consumer:
+    image: wordpress:latest
+    build:
+      context: .
+      dockerfile: dockerfile-consumer
+    volumes:
+      - ./wp-content:/var/www/html/wp-content
+      - ./rabbitmq:/var/www/html/rabbitmq
+      - ./vendor:/var/www/html/vendor
+    environment:
+      - WORDPRESS_DB_HOST=db
+      - WORDPRESS_DB_USER=${LOCAL_DB_USER}
+      - WORDPRESS_DB_PASSWORD=${LOCAL_DB_PASSWORD}
+      - WORDPRESS_DB_NAME=${LOCAL_DB_NAME}
+    command: php /var/www/html/rabbitmq/consumer.php
+    depends_on:
+      - db
+      - rabbitmq
+    restart: always
