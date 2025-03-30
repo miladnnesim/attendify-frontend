@@ -268,7 +268,8 @@ function save_custom_fields_in_account($changes, $user_id) {
             }
         }
     }
-	do_action('profile_update', $user_id, $old_data);
+	do_action('profile_update', $user_id, $changes);
+
 }
 
 function send_user_data_to_rabbitmq_create($user_id, $args) {

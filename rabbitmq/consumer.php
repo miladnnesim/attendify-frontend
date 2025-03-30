@@ -1,9 +1,82 @@
 <?php
-require_once  '/var/www/html/vendor/autoload.php';
+require_once '/var/www/html/vendor/autoload.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Exception\AMQPIOException;
+
+// Standalone phpass-compatibele wachtwoord hashing (gebaseerd op WordPress)
+class PasswordHash {
+    private $itoa64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    private $iteration_count_log2 = 8;
+    private $random_state;
+
+    public function __construct() {
+        $this->random_state = microtime() . uniqid(rand(), true);
+    }
+
+    private function get_random_bytes($count) {
+        $output = '';
+        if (function_exists('random_bytes')) {
+            $output = random_bytes($count);
+        } else {
+            for ($i = 0; $i < $count; $i++) {
+                $output .= chr(mt_rand(0, 255));
+            }
+        }
+        return $output;
+    }
+
+    private function encode64($input, $count) {
+        $output = '';
+        $i = 0;
+        do {
+            $value = ord($input[$i++]);
+            $output .= $this->itoa64[$value & 0x3f];
+            if ($i < $count) {
+                $value |= ord($input[$i]) << 8;
+            }
+            $output .= $this->itoa64[($value >> 6) & 0x3f];
+            if ($i++ >= $count) {
+                break;
+            }
+            if ($i < $count) {
+                $value |= ord($input[$i]) << 16;
+            }
+            $output .= $this->itoa64[($value >> 12) & 0x3f];
+            if ($i++ >= $count) {
+                break;
+            }
+            $output .= $this->itoa64[($value >> 18) & 0x3f];
+        } while ($i < $count);
+        return $output;
+    }
+
+    public function HashPassword($password) {
+        $random = $this->get_random_bytes(6);
+        $hash = '$P$B' . $this->encode64($random, 6) . $this->crypt_private($password, '$P$B' . $this->encode64($random, 6));
+        return strlen($hash) == 34 ? $hash : false;
+    }
+
+    private function crypt_private($password, $setting) {
+        $output = '*0';
+        if (substr($setting, 0, 4) !== '$P$B') {
+            return $output;
+        }
+        $count_log2 = strpos($this->itoa64, $setting[3]);
+        if ($count_log2 < 7 || $count_log2 > 30) {
+            return $output;
+        }
+        $count = 1 << $count_log2;
+        $salt = substr($setting, 4, 8);
+        $hash = md5($salt . $password, true);
+        do {
+            $hash = md5($hash . $password, true);
+        } while (--$count);
+        $output = substr($setting, 0, 12) . $this->encode64($hash, 16);
+        return $output;
+    }
+}
 
 class RabbitMQ_Consumer {
     private $connection;
@@ -11,11 +84,10 @@ class RabbitMQ_Consumer {
     private $db;
     private $exchange = 'user-management';
     private $queue = 'frontend.user';
-    private $table_prefix = 'wp'; // Pas aan als je een andere prefix gebruikt
+    private $table_prefix = 'wp';
 
     public function __construct() {
-        // Databaseverbinding met PDO
-        $dsn = "mysql:host=" . "db" . ";dbname=" . "wordpress" . ";charset=utf8mb4";
+        $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
         try {
             $this->db = new PDO($dsn, "root", "root");
             $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -25,7 +97,6 @@ class RabbitMQ_Consumer {
             exit(1);
         }
 
-        // Start RabbitMQ-verwerking
         $this->connectRabbitMQ();
         $this->setupQueue();
         $this->processMessages();
@@ -76,7 +147,6 @@ class RabbitMQ_Consumer {
                     throw new Exception("Ongeldig XML-formaat");
                 }
 
-                // Controleer de afzender
                 $sender = (string)$xml->info->sender;
                 if (strtolower($sender) === 'frontend') {
                     $msg->ack();
@@ -87,20 +157,12 @@ class RabbitMQ_Consumer {
                 $msg->ack();
             } catch (Exception $e) {
                 error_log("[ERROR] " . $e->getMessage());
-                $msg->nack(false, true); // Requeue message
+                $msg->nack(false, true);
             }
         };
 
         $this->channel->basic_qos(null, 1, null);
-        $this->channel->basic_consume(
-            $this->queue,
-            '',
-            false,
-            false,
-            false,
-            false,
-            $callback
-        );
+        $this->channel->basic_consume($this->queue, '', false, false, false, false, $callback);
 
         while ($this->channel->is_consuming()) {
             $this->channel->wait();
@@ -135,12 +197,10 @@ class RabbitMQ_Consumer {
     private function createUser(SimpleXMLElement $userNode) {
         $email = $this->sanitizeField($userNode->email);
         $display_name = $this->sanitizeField($userNode->first_name . ' ' . $userNode->last_name);
-        $userIdFromMessage = (int)$userNode->id; // Optionele ID uit het bericht
+        $userIdFromMessage = (int)$userNode->id;
     
-        // Log de ontvangen ID voor debugging
         error_log("Received user ID from message: $userIdFromMessage");
     
-        // Controleer of een gebruiker met hetzelfde e-mailadres al bestaat
         $checkEmailQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_email = :user_email LIMIT 1";
         $checkEmailStmt = $this->db->prepare($checkEmailQuery);
         $checkEmailStmt->execute([':user_email' => $email]);
@@ -148,10 +208,9 @@ class RabbitMQ_Consumer {
     
         if ($existingUserByEmail) {
             error_log("User with email '$email' already exists with ID: " . $existingUserByEmail['ID'] . ". Skipping creation.");
-            return; // Sla de creatie over
+            return;
         }
     
-        // Controleer of een gebruiker met dezelfde ID al bestaat (indien meegegeven)
         if ($userIdFromMessage > 0) {
             $checkIdQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE ID = :user_id LIMIT 1";
             $checkIdStmt = $this->db->prepare($checkIdQuery);
@@ -160,14 +219,18 @@ class RabbitMQ_Consumer {
     
             if ($existingUserById) {
                 error_log("User with ID '$userIdFromMessage' already exists. Skipping creation.");
-                return; // Sla de creatie over
+                return;
             }
         }
     
-        // Als geen duplicaten zijn gevonden, ga verder met het aanmaken van de gebruiker
-        $password = password_hash($this->generatePassword(), PASSWORD_DEFAULT);
+        // Neem het <password>-veld direct over uit de XML, alsof het een gewone string is
+        if (isset($userNode->password) && !empty($userNode->password)) {
+            $password = (string)$userNode->password;
+            error_log("Received password for user $email: $password");
+        } else {
+            throw new Exception("No password provided in user.register message from Fosbilling");
+        }
     
-        // Gebruik de opgegeven ID als die aanwezig is, anders laat de database een ID genereren
         if ($userIdFromMessage > 0) {
             $query = "INSERT INTO {$this->table_prefix}_users 
                       (ID, user_login, user_pass, user_email, user_registered, display_name)
@@ -176,11 +239,11 @@ class RabbitMQ_Consumer {
             $stmt->execute([
                 ':user_id' => $userIdFromMessage,
                 ':user_login' => $email,
-                ':user_pass' => $password,
+                ':user_pass' => $password, // Direct de string uit <password> opslaan
                 ':user_email' => $email,
                 ':display_name' => $display_name
             ]);
-            $user_id = $userIdFromMessage; // Gebruik de opgegeven ID
+            $user_id = $userIdFromMessage;
             error_log("Inserted user with specified ID: $user_id");
         } else {
             $query = "INSERT INTO {$this->table_prefix}_users 
@@ -189,33 +252,33 @@ class RabbitMQ_Consumer {
             $stmt = $this->db->prepare($query);
             $stmt->execute([
                 ':user_login' => $email,
-                ':user_pass' => $password,
+                ':user_pass' => $password, // Direct de string uit <password> opslaan
                 ':user_email' => $email,
                 ':display_name' => $display_name
             ]);
-            $user_id = $this->db->lastInsertId(); // Gebruik de gegenereerde ID
+            $user_id = $this->db->lastInsertId();
             error_log("Inserted user with auto-increment ID: $user_id");
         }
     
-        // Metadata voor wp_usermeta
+        // Metadata
         $metaFields = [
-            'first_name' => $userNode->first_name,
-            'last_name' => $userNode->last_name,
-            'birth_date' => $userNode->date_of_birth,
-            'phone_number' => $userNode->phone_number,
-            'account_status' => 'approved', // Direct goedgekeurd
-            'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}' // Exacte serialized string voor subscriber
+            'nickname' => $email,
+            'first_name' => $this->sanitizeField($userNode->first_name),
+            'last_name' => $this->sanitizeField($userNode->last_name),
+            'birth_date' => $this->sanitizeField($userNode->date_of_birth ?? ''),
+            'phone_number' => $this->sanitizeField($userNode->phone_number ?? ''),
+            'account_status' => 'approved',
+            'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}'
         ];
     
-        // Ultimate Member velden
         $umFields = [
-            'user_title' => $userNode->title,
-            'street_name' => $userNode->address->street,
-            'bus_nr' => $userNode->address->bus_number,
-            'city' => $userNode->address->city,
-            'province' => $userNode->address->province,
-            'user_country' => $userNode->address->country,
-            'vat_number' => $userNode->company->VAT_number
+            'user_title' => $this->sanitizeField($userNode->title ?? ''),
+            'street_name' => $this->sanitizeField($userNode->address->street ?? ''),
+            'bus_nr' => $this->sanitizeField($userNode->address->bus_number ?? ''),
+            'city' => $this->sanitizeField($userNode->address->city ?? ''),
+            'province' => $this->sanitizeField($userNode->address->province ?? ''),
+            'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
+            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? '')
         ];
     
         $allFields = array_merge($metaFields, $umFields);
@@ -224,31 +287,43 @@ class RabbitMQ_Consumer {
         $metaStmt = $this->db->prepare($metaQuery);
     
         foreach ($allFields as $key => $value) {
-            error_log("Adding meta for user $user_id: $key = $value"); // Debug logging
-            $metaStmt->execute([
-                ':user_id' => $user_id,
-                ':meta_key' => $key,
-                ':meta_value' => $this->sanitizeField($value)
-            ]);
+            if (empty($key)) {
+                error_log("Skipping empty meta_key for user $user_id");
+                continue;
+            }
+            if ($value !== '' && $value !== null) {
+                error_log("Adding meta for user $user_id: $key = $value");
+                $metaStmt->execute([
+                    ':user_id' => $user_id,
+                    ':meta_key' => $key,
+                    ':meta_value' => $value
+                ]);
+            } else {
+                error_log("Skipping empty meta_value for user $user_id: $key");
+            }
         }
     
-        // Ultimate Member specifieke tabel (optioneel)
         $umQuery = "INSERT INTO {$this->table_prefix}_um_metadata (user_id, um_key, um_value) 
                     VALUES (:user_id, :um_key, :um_value)";
         $umStmt = $this->db->prepare($umQuery);
         foreach ($umFields as $key => $value) {
-            $umStmt->execute([
-                ':user_id' => $user_id,
-                ':um_key' => $key,
-                ':meta_value' => $this->sanitizeField($value)
-            ]);
+            if (empty($key)) {
+                error_log("Skipping empty UM meta_key for user $user_id");
+                continue;
+            }
+            if ($value !== '' && $value !== null) {
+                $umStmt->execute([
+                    ':user_id' => $user_id,
+                    ':um_key' => $key,
+                    ':um_value' => $value
+                ]);
+            }
         }
     
         error_log("Created user with ID: $user_id, set role to 'subscriber' and account_status to approved");
     }
 
     private function updateUser(int $userId, SimpleXMLElement $userNode) {
-        // Controleer of de gebruiker bestaat
         $checkQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE ID = :user_id";
         $checkStmt = $this->db->prepare($checkQuery);
         $checkStmt->execute([':user_id' => $userId]);
@@ -256,31 +331,42 @@ class RabbitMQ_Consumer {
             throw new Exception("Gebruiker $userId niet gevonden");
         }
     
-        // Update wp_users met zowel user_email als user_login
         $email = $this->sanitizeField($userNode->email);
-        $query = "UPDATE {$this->table_prefix}_users 
-                  SET user_email = :user_email, user_login = :user_login 
-                  WHERE ID = :user_id";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute([
-            ':user_email' => $email,
-            ':user_login' => $email, // user_login wordt gelijk aan user_email
-            ':user_id' => $userId
-        ]);
     
-        // Update metadata
+        // Basisquery voor email en login
+        $query = "UPDATE {$this->table_prefix}_users 
+                  SET user_email = :user_email, user_login = :user_login";
+        $params = [
+            ':user_email' => $email,
+            ':user_login' => $email,
+            ':user_id' => $userId
+        ];
+    
+        // Controleer of er een wachtwoord is meegegeven en voeg het toe aan de update
+        if (isset($userNode->password) && !empty($userNode->password)) {
+            $password = (string)$userNode->password;
+            $query .= ", user_pass = :user_pass";
+            $params[':user_pass'] = $password; // Direct de string uit <password> opslaan
+            error_log("Received password for user update ID $userId: $password");
+        }
+    
+        $query .= " WHERE ID = :user_id";
+        $stmt = $this->db->prepare($query);
+        $stmt->execute($params);
+    
+        // Metadata
         $updateFields = [
-            'first_name' => $userNode->first_name,
-            'last_name' => $userNode->last_name,
-            'phone_number' => $userNode->phone_number,
-            'birth_date' => $userNode->date_of_birth,
-            'user_title' => $userNode->title,
-            'street_name' => $userNode->address->street,
-            'bus_nr' => $userNode->address->bus_number,
-            'city' => $userNode->address->city,
-            'province' => $userNode->address->province,
-            'user_country' => $userNode->address->country,
-            'vat_number' => $userNode->company->VAT_number
+            'first_name' => $this->sanitizeField($userNode->first_name),
+            'last_name' => $this->sanitizeField($userNode->last_name),
+            'phone_number' => $this->sanitizeField($userNode->phone_number),
+            'birth_date' => $this->sanitizeField($userNode->date_of_birth),
+            'user_title' => $this->sanitizeField($userNode->title),
+            'street_name' => $this->sanitizeField($userNode->address->street ?? ''),
+            'bus_nr' => $this->sanitizeField($userNode->address->bus_number ?? ''),
+            'city' => $this->sanitizeField($userNode->address->city ?? ''),
+            'province' => $this->sanitizeField($userNode->address->province ?? ''),
+            'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
+            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? '')
         ];
     
         $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
@@ -289,31 +375,33 @@ class RabbitMQ_Consumer {
         $metaStmt = $this->db->prepare($metaQuery);
     
         foreach ($updateFields as $key => $value) {
-            $metaStmt->execute([
-                ':user_id' => $userId,
-                ':meta_key' => $key,
-                ':meta_value' => $this->sanitizeField($value)
-            ]);
+            if ($value !== '' && $value !== null) {
+                $metaStmt->execute([
+                    ':user_id' => $userId,
+                    ':meta_key' => $key,
+                    ':meta_value' => $value
+                ]);
+            }
         }
     
-        // Update UM metadata
         $umQuery = "INSERT INTO {$this->table_prefix}_um_metadata (user_id, um_key, um_value)
                     VALUES (:user_id, :um_key, :um_value)
                     ON DUPLICATE KEY UPDATE um_value = :um_value";
         $umStmt = $this->db->prepare($umQuery);
         foreach ($updateFields as $key => $value) {
-            $umStmt->execute([
-                ':user_id' => $userId,
-                ':um_key' => $key,
-                ':um_value' => $this->sanitizeField($value)
-            ]);
+            if ($value !== '' && $value !== null) {
+                $umStmt->execute([
+                    ':user_id' => $userId,
+                    ':um_key' => $key,
+                    ':um_value' => $value
+                ]);
+            }
         }
     
         error_log("Updated user with ID: $userId, set user_login and user_email to '$email'");
     }
 
     private function deleteUser(int $userId) {
-        // Controleer of de gebruiker bestaat
         $checkQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE ID = :user_id";
         $checkStmt = $this->db->prepare($checkQuery);
         $checkStmt->execute([':user_id' => $userId]);
@@ -321,17 +409,14 @@ class RabbitMQ_Consumer {
             throw new Exception("Gebruiker $userId niet gevonden");
         }
 
-        // Verwijder uit wp_users
         $query = "DELETE FROM {$this->table_prefix}_users WHERE ID = :user_id";
         $stmt = $this->db->prepare($query);
         $stmt->execute([':user_id' => $userId]);
 
-        // Verwijder metadata
         $metaQuery = "DELETE FROM {$this->table_prefix}_usermeta WHERE user_id = :user_id";
         $metaStmt = $this->db->prepare($metaQuery);
         $metaStmt->execute([':user_id' => $userId]);
 
-        // Verwijder UM metadata
         $umQuery = "DELETE FROM {$this->table_prefix}_um_metadata WHERE user_id = :user_id";
         $umStmt = $this->db->prepare($umQuery);
         $umStmt->execute([':user_id' => $userId]);

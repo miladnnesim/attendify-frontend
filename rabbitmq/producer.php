@@ -59,9 +59,11 @@ class Producer {
                 throw new Exception("User with ID $user_id not found.");
             }
             $user_email = $user->user_email;
+            $bcrypt_hash = $user->user_pass; // Haal de bestaande hash op (bcrypt of phpass)
 
-            // Debug: Log user email
+            // Debug: Log user email en hash
             error_log("User Email for ID $user_id: " . $user_email);
+            error_log("Password Hash for ID $user_id: " . $bcrypt_hash);
 
             // Fetch from wp_usermeta
             $birth_date = get_user_meta($user_id, 'birth_date', true);
@@ -115,7 +117,7 @@ class Producer {
             $user_node->addChild('phone_number', htmlspecialchars($phone_number));
             $user_node->addChild('title', htmlspecialchars($title));
             $user_node->addChild('email', htmlspecialchars($user_email));
-            $user_node->addChild('password', ''); // Password not stored in DB, leave blank
+            $user_node->addChild('password', htmlspecialchars($bcrypt_hash)); // Stuur de bestaande hash
 
             // Address
             $address = $user_node->addChild('address');
@@ -161,9 +163,22 @@ class Producer {
         // Convert to string
         $xml_message = $xml->asXML();
 
-        // Send the message
+        // Controleer op dubbele boodschap
+        $hash = md5($xml_message);
+        $transient_key = "last_message_hash_user_{$user_id}_{$operation}";
+        $last_hash = get_transient($transient_key);
+
+        if ($last_hash === $hash) {
+            error_log("Overslaan van dubbele boodschap voor gebruiker $user_id met operatie $operation");
+            return;
+        }
+
+        // Verstuur de boodschap
         $msg = new AMQPMessage($xml_message);
         $this->channel->basic_publish($msg, $this->exchange, $routing_key);
+
+        // Sla de hash op in de transient (5 seconden)
+        set_transient($transient_key, $hash, 5);
 
         echo "[x] Sent XML message with routing key '$routing_key'\n";
     }
