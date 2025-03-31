@@ -1,5 +1,6 @@
 services:
   wordpress:
+    env_file: ./.env
     build:
       context: .
       dockerfile: Dockerfile-wordpress
@@ -20,6 +21,7 @@ services:
       - WORDPRESS_DEBUG=1
 
   db:
+    env_file: ./.env
     image: mysql:8.0
     environment:
       - MYSQL_ROOT_PASSWORD=${LOCAL_DB_PASSWORD}
@@ -52,6 +54,7 @@ services:
       - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
 
   python:
+    env_file: ./.env
     image: python:3.9
     container_name: configure-service
     volumes:
@@ -67,6 +70,7 @@ services:
       - "pip install pika && /usr/local/bin/wait-for-rabbitmq.sh && python3 /usr/local/bin/configure.py"
 
   consumer-user:
+    env_file: ./.env
     image: wordpress:latest
     build:
       context: .
@@ -87,6 +91,7 @@ services:
     restart: always
 
   heartbeat:
+    env_file: ./.env
     image: python:3.9
     volumes:
       - ./heartbeat/heartbeat.py:/usr/local/bin/heartbeat.py

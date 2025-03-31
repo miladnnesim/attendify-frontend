@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 RABBITMQ_HOST = 'rabbitmq'
 RABBITMQ_PORT = 5672
 RABBITMQ_USERNAME = 'attendify'
-RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD', 'uXe5u1oWkh32JyLA')  # Default voor testen
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD')  # Default voor testen
 RABBITMQ_VHOST = 'attendify'
 
 # Heartbeat-specific parameters

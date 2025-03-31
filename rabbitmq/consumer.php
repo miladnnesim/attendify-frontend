@@ -89,7 +89,7 @@ class RabbitMQ_Consumer {
     public function __construct() {
         $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
         try {
-            $this->db = new PDO($dsn, "root", "root");
+            $this->db = new PDO($dsn, getenv('LOCAL_DB_USER'), getenv('LOCAL_DB_PASSWORD'));
             $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             error_log("Successfully connected to database");
         } catch (PDOException $e) {
@@ -112,7 +112,7 @@ class RabbitMQ_Consumer {
                     'rabbitmq',
                     5672,
                     'attendify',
-                    'uXe5u1oWkh32JyLA',
+                    getenv('RABBITMQ_PASSWORD'),
                     'attendify'
                 );
                 $this->channel = $this->connection->channel();
@@ -180,7 +180,7 @@ class RabbitMQ_Consumer {
         $userId = (int)$userNode->id;
 
         switch ($operation) {
-            case 'register':
+            case 'create':
                 $this->createUser($userNode);
                 break;
             case 'update':

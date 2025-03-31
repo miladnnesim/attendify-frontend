@@ -19,7 +19,13 @@ class Producer {
     private $exchange = 'user-management';
 
     public function __construct() {
-        $this->connection = new AMQPStreamConnection('rabbitmq', 5672, 'attendify', 'uXe5u1oWkh32JyLA', 'attendify');
+        $this->connection = new AMQPStreamConnection(
+            'rabbitmq',
+            5672,
+            'attendify',
+            getenv('RABBITMQ_PASSWORD'),
+            'attendify'
+        );
         $this->channel = $this->connection->channel();
         $this->channel->exchange_declare($this->exchange, 'direct', false, true, false);
     }
@@ -52,7 +58,7 @@ class Producer {
         $user_node->addChild('id', $user_id);
 
         // For delete operation, we only need the user ID
-        if ($operation !== 'delete') {
+        
             // Fetch user data from wp_users
             $user = get_userdata($user_id);
             if (!$user) {
@@ -158,7 +164,7 @@ class Producer {
             $company_address->addChild('postal_code', '');
 
             $user_node->addChild('from_company', 'false');
-        }
+        
 
         // Convert to string
         $xml_message = $xml->asXML();
