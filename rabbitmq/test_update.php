@@ -17,7 +17,7 @@ $channel = $connection->channel();
 
 // Exchange declareren (moet overeenkomen met je consumer)
 $exchange = 'user-management';
-$channel->exchange_declare($exchange, 'direct', false, true, false);
+#$channel->exchange_declare($exchange, 'direct', false, true, false);
 
 // Hardcoded XML bericht
 $xml = '<?xml version="1.0"?>

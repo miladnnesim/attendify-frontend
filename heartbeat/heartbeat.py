@@ -37,11 +37,11 @@ def main():
     channel = connection.channel()
 
     # Declareer de exchange (type 'direct' voor eenvoudige routing)
-    channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
+    #channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
 
     # Declareer de queue en bind deze aan de exchange met de routing key
-    channel.queue_declare(queue=QUEUE_NAME, durable=True)
-    channel.queue_bind(queue=QUEUE_NAME, exchange=EXCHANGE_NAME, routing_key=ROUTING_KEY)
+    #channel.queue_declare(queue=QUEUE_NAME, durable=True)
+    #channel.queue_bind(queue=QUEUE_NAME, exchange=EXCHANGE_NAME, routing_key=ROUTING_KEY)
 
     logging.info(f"Starting heartbeat for {CONTAINER_NAME} to exchange {EXCHANGE_NAME} with routing key {ROUTING_KEY}")
     try:
