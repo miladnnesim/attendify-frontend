@@ -34,7 +34,7 @@ services:
     ports:
       - "8080:80"
     environment:
-      - PMA_HOST=db
+      - PMA_HOST=${LOCAL_DB_HOST}
       - PMA_USER=${LOCAL_DB_USER}
       - PMA_PASSWORD=${LOCAL_DB_PASSWORD}
       - PMA_ARBITRARY=1
@@ -45,11 +45,11 @@ services:
     restart: always
     environment:
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-      - RABBITMQ_DEFAULT_USER=attendify
-      - RABBITMQ_DEFAULT_VHOST=attendify
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_HOST}
     ports:
-      - "15672:15672" # RabbitMQ Management Plugin
-      - "5672:5672" # AMQP
+      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}" # 15672:15672 RabbitMQ Management
+      - "${RABBITMQ_AMQP_PORT}:${RABBITMQ_AMQP_PORT}" # "5672:5672" AMQP
     volumes:
       - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
 
@@ -80,7 +80,7 @@ services:
       - ./rabbitmq:/var/www/html/rabbitmq
       - ./vendor:/var/www/html/vendor
     environment:
-      - WORDPRESS_DB_HOST=db
+      - WORDPRESS_DB_HOST=${LOCAL_DB_HOST}
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
       - WORDPRESS_DB_PASSWORD=${LOCAL_DB_PASSWORD}
       - WORDPRESS_DB_NAME=${LOCAL_DB_NAME}

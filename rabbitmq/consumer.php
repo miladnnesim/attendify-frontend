@@ -6,77 +6,7 @@ use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Exception\AMQPIOException;
 
 // Standalone phpass-compatibele wachtwoord hashing (gebaseerd op WordPress)
-class PasswordHash {
-    private $itoa64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-    private $iteration_count_log2 = 8;
-    private $random_state;
 
-    public function __construct() {
-        $this->random_state = microtime() . uniqid(rand(), true);
-    }
-
-    private function get_random_bytes($count) {
-        $output = '';
-        if (function_exists('random_bytes')) {
-            $output = random_bytes($count);
-        } else {
-            for ($i = 0; $i < $count; $i++) {
-                $output .= chr(mt_rand(0, 255));
-            }
-        }
-        return $output;
-    }
-
-    private function encode64($input, $count) {
-        $output = '';
-        $i = 0;
-        do {
-            $value = ord($input[$i++]);
-            $output .= $this->itoa64[$value & 0x3f];
-            if ($i < $count) {
-                $value |= ord($input[$i]) << 8;
-            }
-            $output .= $this->itoa64[($value >> 6) & 0x3f];
-            if ($i++ >= $count) {
-                break;
-            }
-            if ($i < $count) {
-                $value |= ord($input[$i]) << 16;
-            }
-            $output .= $this->itoa64[($value >> 12) & 0x3f];
-            if ($i++ >= $count) {
-                break;
-            }
-            $output .= $this->itoa64[($value >> 18) & 0x3f];
-        } while ($i < $count);
-        return $output;
-    }
-
-    public function HashPassword($password) {
-        $random = $this->get_random_bytes(6);
-        $hash = '$P$B' . $this->encode64($random, 6) . $this->crypt_private($password, '$P$B' . $this->encode64($random, 6));
-        return strlen($hash) == 34 ? $hash : false;
-    }
-
-    private function crypt_private($password, $setting) {
-        $output = '*0';
-        if (substr($setting, 0, 4) !== '$P$B') {
-            return $output;
-        }
-        $count_log2 = strpos($this->itoa64, $setting[3]);
-        if ($count_log2 < 7 || $count_log2 > 30) {
-            return $output;
-        }
-        $count = 1 << $count_log2;
-        $salt = substr($setting, 4, 8);
-        $hash = md5($salt . $password, true);
-        do {
-            $hash = md5($hash . $password, true);
-        } while (--$count);
-        $output = substr($setting, 0, 12) . $this->encode64($hash, 16);
-        return $output;
-    }
-}
 
 class RabbitMQ_Consumer {
     private $connection;
@@ -109,11 +39,11 @@ class RabbitMQ_Consumer {
         for ($i = 0; $i < $maxRetries; $i++) {
             try {
                 $this->connection = new AMQPStreamConnection(
-                    'rabbitmq',
-                    5672,
-                    'attendify',
-                    getenv('RABBITMQ_PASSWORD'),
-                    'attendify'
+                    'rabbitmq', # naam container
+                    getenv('RABBITMQ_AMQP_PORT'),
+                    getenv('RABBITMQ_HOST'),
+                    getenv('RABBITMQ_PASSWORD'),# mogelijk dat de host en user door elkaar zijn
+                    getenv('RABBITMQ_USER')
                 );
                 $this->channel = $this->connection->channel();
                 error_log("Successfully connected to RabbitMQ");
@@ -428,10 +358,7 @@ class RabbitMQ_Consumer {
         return htmlspecialchars(strip_tags((string)$value));
     }
 
-    private function generatePassword($length = 12) {
-        $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
-        return substr(str_shuffle($chars), 0, $length);
-    }
+    
 }
 
 // Start de consumer

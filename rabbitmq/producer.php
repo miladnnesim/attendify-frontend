@@ -20,11 +20,11 @@ class Producer {
 
     public function __construct() {
         $this->connection = new AMQPStreamConnection(
-            'rabbitmq',
-            5672,
-            'attendify',
-            getenv('RABBITMQ_PASSWORD'),
-            'attendify'
+            'rabbitmq', # naam container
+            getenv('RABBITMQ_AMQP_PORT'),
+            getenv('RABBITMQ_HOST'),
+            getenv('RABBITMQ_PASSWORD'),# mogelijk dat de host en user door elkaar zijn
+            getenv('RABBITMQ_USER')
         );
         $this->channel = $this->connection->channel();
         $this->channel->exchange_declare($this->exchange, 'direct', false, true, false);
