@@ -27,7 +27,7 @@ class Producer {
             getenv('RABBITMQ_USER')
         );
         $this->channel = $this->connection->channel();
-        $this->channel->exchange_declare($this->exchange, 'direct', false, true, false);
+        #$this->channel->exchange_declare($this->exchange, 'direct', false, true, false);
     }
 
     public function sendUserData($user_id, $operation = 'create') {

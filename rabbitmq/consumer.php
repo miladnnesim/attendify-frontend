@@ -60,8 +60,8 @@ class RabbitMQ_Consumer {
     }
 
     private function setupQueue() {
-        $this->channel->exchange_declare($this->exchange, 'direct', false, true, false);
-        $this->channel->queue_declare($this->queue, false, true, false, false);
+        #$this->channel->exchange_declare($this->exchange, 'direct', false, true, false);
+        #$this->channel->queue_declare($this->queue, false, true, false, false);
 
         $routingKeys = ['user.register', 'user.update', 'user.delete'];
         foreach ($routingKeys as $rk) {
