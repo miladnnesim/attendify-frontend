@@ -20,9 +20,9 @@ class Producer {
 
     public function __construct() {
         $this->connection = new AMQPStreamConnection(
-            'rabbitmq', # naam container
+            'integrationproject-2425s2-002.westeurope.cloudapp.azure.com', # naam container
             getenv('RABBITMQ_AMQP_PORT'),
-            getenv('RABBITMQ_HOST'),
+            getenv('RABBITMQ_USER'),
             getenv('RABBITMQ_PASSWORD'),# mogelijk dat de host en user door elkaar zijn
             getenv('RABBITMQ_USER')
         );

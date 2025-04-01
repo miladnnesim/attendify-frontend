@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile-wordpress
     image: wordpress:latest
     ports:
-      - "8000:80"
+      - "30011:80"
     volumes:
       - ./.docker/uploads:/var/www/html/wp-content/uploads
       - ./wp-content:/var/www/html/wp-content
@@ -39,36 +39,6 @@ services:
       - PMA_PASSWORD=${LOCAL_DB_PASSWORD}
       - PMA_ARBITRARY=1
 
-  rabbitmq:
-    image: rabbitmq:4-management
-    container_name: some-rabbit
-    restart: always
-    environment:
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_HOST}
-    ports:
-      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}" # 15672:15672 RabbitMQ Management
-      - "${RABBITMQ_AMQP_PORT}:${RABBITMQ_AMQP_PORT}" # "5672:5672" AMQP
-    volumes:
-      - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
-
-  python:
-    env_file: ./.env
-    image: python:3.9
-    container_name: configure-service
-    volumes:
-      - ./configure.py:/usr/local/bin/configure.py
-      - ./wait-for-rabbitmq.sh:/usr/local/bin/wait-for-rabbitmq.sh
-    environment:
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
-    depends_on:
-      - rabbitmq
-    command:
-      - "sh"
-      - "-c"
-      - "pip install pika && /usr/local/bin/wait-for-rabbitmq.sh && python3 /usr/local/bin/configure.py"
-
   consumer-user:
     env_file: ./.env
     image: wordpress:latest
@@ -87,23 +57,4 @@ services:
     command: php /var/www/html/rabbitmq/consumer.php
     depends_on:
       - db
-      - rabbitmq
     restart: always
-
-  heartbeat:
-    env_file: ./.env
-    image: python:3.9
-    volumes:
-      - ./heartbeat/heartbeat.py:/usr/local/bin/heartbeat.py
-      - ./wait-for-rabbitmq.sh:/usr/local/bin/wait-for-rabbitmq.sh
-    environment:
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
-      - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
-      - LOCAL_DB_NAME=${LOCAL_DB_NAME}
-    depends_on:
-      - rabbitmq
-      - db
-    command:
-      - "sh"
-      - "-c"
-      - "pip install pika && /usr/local/bin/wait-for-rabbitmq.sh && pip install mysql-connector-python && python3 /usr/local/bin/heartbeat.py"
