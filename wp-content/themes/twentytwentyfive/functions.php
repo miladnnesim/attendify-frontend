@@ -280,8 +280,7 @@ function send_user_data_to_rabbitmq_create($user_id, $args) {
         error_log("Failed to send user data to RabbitMQ (create): " . $e->getMessage());
     }
 }
-add_action('user_register', 'send_user_data_to_rabbitmq_create', 10, 2);
-
+add_action('um_registration_complete', 'send_user_data_to_rabbitmq_create', 10, 2);
 // Hook into user update (voor update)
 function send_user_data_to_rabbitmq_update($user_id, $old_data) {
     try {
