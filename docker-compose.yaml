@@ -59,7 +59,6 @@ services:
     container_name: configure-service
     volumes:
       - ./configure.py:/usr/local/bin/configure.py
-      - ./wait.sh:/usr/local/bin/wait.sh
     environment:
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
     depends_on:
@@ -67,7 +66,8 @@ services:
     command:
       - "sh"
       - "-c"
-      - "pip install pika && /usr/local/bin/wait.sh && python3 /usr/local/bin/configure.py"
+      - "pip install pika && python3 /usr/local/bin/configure.py"
+    restart: on-failure
 
   consumer-user:
     env_file: ./.env
@@ -95,7 +95,6 @@ services:
     image: python:3.9
     volumes:
       - ./heartbeat/heartbeat.py:/usr/local/bin/heartbeat.py
-      - ./wait.sh:/usr/local/bin/wait.sh
     environment:
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
       - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
@@ -106,4 +105,5 @@ services:
     command:
       - "sh"
       - "-c"
-      - "pip install pika && /usr/local/bin/wait.sh && pip install mysql-connector-python && python3 /usr/local/bin/heartbeat.py"
+      - "pip install pika && pip install mysql-connector-python && python3 /usr/local/bin/heartbeat.py"
+    restart: on-failure
