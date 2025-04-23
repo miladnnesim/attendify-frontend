@@ -8,10 +8,10 @@ services:
     ports:
       - "30011:80"
     volumes:
-      - ./.docker/uploads:/var/www/html/wp-content/uploads
-      - ./wp-content:/var/www/html/wp-content
-      - ./rabbitmq:/var/www/html/rabbitmq
-      - ./vendor:/var/www/html/vendor
+      - ./volumes/.docker/uploads:/var/www/html/wp-content/uploads
+      - ./volumes/wp-content:/var/www/html/wp-content
+      - ./volumes/rabbitmq:/var/www/html/rabbitmq
+      - ./volumes/vendor:/var/www/html/vendor
     environment:
       - WORDPRESS_DB_HOST=${LOCAL_DB_HOST} # tijdelijk lokale MySQL container
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
@@ -27,7 +27,7 @@ services:
       - MYSQL_ROOT_PASSWORD=${LOCAL_DB_PASSWORD}
       - MYSQL_DATABASE=${LOCAL_DB_NAME}
     volumes:
-      - ./.docker/mysql-data:/var/lib/mysql
+      - ./volumes/.docker/mysql-data:/var/lib/mysql
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
@@ -58,7 +58,7 @@ services:
     image: python:3.9
     container_name: configure-service
     volumes:
-      - ./configure.py:/usr/local/bin/configure.py
+      - ./volumes/configure.py:/usr/local/bin/configure.py
     environment:
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
     depends_on:
@@ -76,9 +76,9 @@ services:
       context: .
       dockerfile: dockerfile-consumer
     volumes:
-      - ./wp-content:/var/www/html/wp-content
-      - ./rabbitmq:/var/www/html/rabbitmq
-      - ./vendor:/var/www/html/vendor
+      - ./volumes/wp-content:/var/www/html/wp-content
+      - ./volumes/rabbitmq:/var/www/html/rabbitmq
+      - ./volumes/vendor:/var/www/html/vendor
     environment:
       - WORDPRESS_DB_HOST=${LOCAL_DB_HOST}
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
@@ -94,7 +94,7 @@ services:
     env_file: ./.env
     image: python:3.9
     volumes:
-      - ./heartbeat/heartbeat.py:/usr/local/bin/heartbeat.py
+      - ./volumes/heartbeat/heartbeat.py:/usr/local/bin/heartbeat.py
     environment:
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
       - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
