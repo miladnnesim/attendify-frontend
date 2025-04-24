@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile-wordpress
     image: wordpress:latest
     ports:
-      - "30011:80"
+      - "30024:80"
     volumes:
       - ./volumes/.docker/uploads:/var/www/html/wp-content/uploads
       - ./volumes/wp-content:/var/www/html/wp-content
@@ -32,7 +32,7 @@ services:
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
     ports:
-      - "8080:80"
+      - "30023:80"
     environment:
       - PMA_HOST=${LOCAL_DB_HOST}
       - PMA_USER=${LOCAL_DB_USER}
@@ -52,6 +52,8 @@ services:
       - "${RABBITMQ_AMQP_PORT}:${RABBITMQ_AMQP_PORT}" # "5672:5672" AMQP
     volumes:
       - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
+    profiles:
+      - dev
 
   python:
     env_file: ./.env
@@ -68,6 +70,8 @@ services:
       - "-c"
       - "pip install pika && python3 /usr/local/bin/configure.py"
     restart: on-failure
+    profiles:
+      - dev
 
   consumer-user:
     env_file: ./.env
