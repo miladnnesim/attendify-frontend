@@ -44,16 +44,10 @@ jobs:
   deploy:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: ci
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: ci # Alleen deployen als CI slaagt
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Alleen bij push naar main
 
     steps:
-      - name: Debug Secrets
-        run: |
-          echo "Host: ${{ secrets.SERVER_HOST }}"
-          echo "User: ${{ secrets.SERVER_USER }}"
-          echo "Key length: ${#secrets.SSH_PRIVATE_KEY}"
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -64,5 +58,5 @@ jobs:
           script: |
             cd ~/attendify/attendify-frontend
             git pull origin main
-            docker compose down
+            docker compose down # Optioneel: stop bestaande containers
             docker compose up -d --build
