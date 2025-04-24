@@ -16,7 +16,7 @@ RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD', 'uXe5u1oWkh32JyLA')  # D
 RABBITMQ_VHOST = 'attendify'
 
 # Heartbeat-specific parameters
-SENDER = 'planning'
+SENDER = 'frontend'
 CONTAINER_NAME = os.environ.get('CONTAINER_NAME', 'heartbeat')  # Kan overschreven worden via env
 EXCHANGE_NAME = 'monitoring'
 QUEUE_NAME = 'monitoring.heartbeat'
