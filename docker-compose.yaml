@@ -95,7 +95,6 @@ services:
     command: php /var/www/html/rabbitmq/consumer.php
     depends_on:
       - db
-      - rabbitmq
     restart: always
 
   heartbeat:
@@ -108,7 +107,6 @@ services:
       - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
       - LOCAL_DB_NAME=${LOCAL_DB_NAME}
     depends_on:
-      - rabbitmq
       - db
     command:
       - "sh"
