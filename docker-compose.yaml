@@ -1,6 +1,8 @@
 networks:
   attendify_net:
     external: true
+  frontend_net:
+    driver: bridge
 
 services:
   wordpress:
@@ -25,6 +27,7 @@ services:
       - WORDPRESS_DEBUG=1
     networks:
       - attendify_net
+      - frontend_net
 
   db:
     env_file: ./.env
@@ -34,6 +37,8 @@ services:
       - MYSQL_DATABASE=${LOCAL_DB_NAME}
     volumes:
       - ./volumes/.docker/mysql-data:/var/lib/mysql
+    networks:
+      - frontend_net
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
@@ -44,6 +49,8 @@ services:
       - PMA_USER=${LOCAL_DB_USER}
       - PMA_PASSWORD=${LOCAL_DB_PASSWORD}
       - PMA_ARBITRARY=1
+    networks:
+      - frontend_net
 
   rabbitmq:
     image: rabbitmq:4-management
@@ -100,6 +107,7 @@ services:
     restart: always
     networks:
       - attendify_net
+      - frontend_net
 
   heartbeat:
     env_file: ./.env
@@ -119,3 +127,4 @@ services:
     restart: on-failure
     networks:
       - attendify_net
+      - frontend_net
