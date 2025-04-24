@@ -23,6 +23,8 @@ services:
       - WORDPRESS_DB_NAME=${LOCAL_DB_NAME}
       - WORDPRESS_TABLEPREFIX=wp
       - WORDPRESS_DEBUG=1
+    networks:
+      - attendify_net
 
   db:
     env_file: ./.env
@@ -96,6 +98,8 @@ services:
     depends_on:
       - db
     restart: always
+    networks:
+      - attendify_net
 
   heartbeat:
     env_file: ./.env
@@ -113,3 +117,5 @@ services:
       - "-c"
       - "pip install pika && pip install mysql-connector-python && python3 /usr/local/bin/heartbeat.py"
     restart: on-failure
+    networks:
+      - attendify_net
