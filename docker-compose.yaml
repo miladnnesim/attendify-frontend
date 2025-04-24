@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile-wordpress
     image: wordpress:latest
     ports:
-      - "30024:80"
+      - "30025:80"
     volumes:
       - ./volumes/.docker/uploads:/var/www/html/wp-content/uploads
       - ./volumes/wp-content:/var/www/html/wp-content
