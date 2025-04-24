@@ -1,3 +1,7 @@
+networks:
+  attendify_net:
+    external: true
+
 services:
   wordpress:
     env_file: ./.env
