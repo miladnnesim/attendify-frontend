@@ -4,3 +4,7 @@ full-db-export.sql
 /vendor
 /attendify-rabbitmq/vendor
 /wp-content/plugins/rabbitmq-plugin/vendor
+/volumes/wp-content/plugins/rabbitmq-plugin/vendor
+/volumes/vendor
+
+/volumes/docker

@@ -5,16 +5,18 @@ import logging
 from datetime import datetime
 import xml.etree.ElementTree as ET
 
+# Configure logging
 logging.basicConfig(level=logging.INFO)
+
 # RabbitMQ connection parameters
 RABBITMQ_HOST = 'rabbitmq'
-RABBITMQ_PORT = os.environ.get('RABBITMQ_AMQP_PORT')
-RABBITMQ_USERNAME = os.environ.get('RABBITMQ_USER')
-RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD')  # Default voor testen
-RABBITMQ_VHOST = os.environ.get('RABBITMQ_HOST')
+RABBITMQ_PORT = 5672
+RABBITMQ_USERNAME = 'attendify'
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD', 'uXe5u1oWkh32JyLA')  # Default voor testen
+RABBITMQ_VHOST = 'attendify'
 
 # Heartbeat-specific parameters
-SENDER = 'Frontend'
+SENDER = 'planning'
 CONTAINER_NAME = os.environ.get('CONTAINER_NAME', 'heartbeat')  # Kan overschreven worden via env
 EXCHANGE_NAME = 'monitoring'
 QUEUE_NAME = 'monitoring.heartbeat'
@@ -32,18 +34,18 @@ def create_heartbeat_message():
 def main():
     credentials = pika.PlainCredentials(username=RABBITMQ_USERNAME, password=RABBITMQ_PASSWORD)
     connection = pika.BlockingConnection(
-        pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT, credentials=credentials, virtual_host=RABBITMQ_VHOST)
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            port=RABBITMQ_PORT,
+            credentials=credentials,
+            virtual_host=RABBITMQ_VHOST
+        )
     )
     channel = connection.channel()
 
-    # Declareer de exchange (type 'direct' voor eenvoudige routing)
-    #channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
+    # Declareer de exchange (zorg dat deze bestaat)
+    logging.info(f"Starting heartbeat for {CONTAINER_NAME} to exchange '{EXCHANGE_NAME}' with routing key '{ROUTING_KEY}'")
 
-    # Declareer de queue en bind deze aan de exchange met de routing key
-    #channel.queue_declare(queue=QUEUE_NAME, durable=True)
-    #channel.queue_bind(queue=QUEUE_NAME, exchange=EXCHANGE_NAME, routing_key=ROUTING_KEY)
-
-    logging.info(f"Starting heartbeat for {CONTAINER_NAME} to exchange {EXCHANGE_NAME} with routing key {ROUTING_KEY}")
     try:
         while True:
             message = create_heartbeat_message()

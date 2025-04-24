@@ -6,12 +6,12 @@ services:
       dockerfile: Dockerfile-wordpress
     image: wordpress:latest
     ports:
-      - "8000:80"
+      - "30024:80"
     volumes:
-      - ./.docker/uploads:/var/www/html/wp-content/uploads
-      - ./wp-content:/var/www/html/wp-content
-      - ./rabbitmq:/var/www/html/rabbitmq
-      - ./vendor:/var/www/html/vendor
+      - ./volumes/.docker/uploads:/var/www/html/wp-content/uploads
+      - ./volumes/wp-content:/var/www/html/wp-content
+      - ./volumes/rabbitmq:/var/www/html/rabbitmq
+      - ./volumes/vendor:/var/www/html/vendor
     environment:
       - WORDPRESS_DB_HOST=${LOCAL_DB_HOST} # tijdelijk lokale MySQL container
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
@@ -27,12 +27,12 @@ services:
       - MYSQL_ROOT_PASSWORD=${LOCAL_DB_PASSWORD}
       - MYSQL_DATABASE=${LOCAL_DB_NAME}
     volumes:
-      - ./.docker/mysql-data:/var/lib/mysql
+      - ./volumes/.docker/mysql-data:/var/lib/mysql
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
     ports:
-      - "8080:80"
+      - "30023:80"
     environment:
       - PMA_HOST=${LOCAL_DB_HOST}
       - PMA_USER=${LOCAL_DB_USER}
@@ -52,14 +52,15 @@ services:
       - "${RABBITMQ_AMQP_PORT}:${RABBITMQ_AMQP_PORT}" # "5672:5672" AMQP
     volumes:
       - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
+    profiles:
+      - dev
 
   python:
     env_file: ./.env
     image: python:3.9
     container_name: configure-service
     volumes:
-      - ./configure.py:/usr/local/bin/configure.py
-      - ./wait-for-rabbitmq.sh:/usr/local/bin/wait-for-rabbitmq.sh
+      - ./volumes/configure.py:/usr/local/bin/configure.py
     environment:
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
     depends_on:
@@ -67,7 +68,10 @@ services:
     command:
       - "sh"
       - "-c"
-      - "pip install pika && /usr/local/bin/wait-for-rabbitmq.sh && python3 /usr/local/bin/configure.py"
+      - "pip install pika && python3 /usr/local/bin/configure.py"
+    restart: on-failure
+    profiles:
+      - dev
 
   consumer-user:
     env_file: ./.env
@@ -76,9 +80,9 @@ services:
       context: .
       dockerfile: dockerfile-consumer
     volumes:
-      - ./wp-content:/var/www/html/wp-content
-      - ./rabbitmq:/var/www/html/rabbitmq
-      - ./vendor:/var/www/html/vendor
+      - ./volumes/wp-content:/var/www/html/wp-content
+      - ./volumes/rabbitmq:/var/www/html/rabbitmq
+      - ./volumes/vendor:/var/www/html/vendor
     environment:
       - WORDPRESS_DB_HOST=${LOCAL_DB_HOST}
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
@@ -94,8 +98,7 @@ services:
     env_file: ./.env
     image: python:3.9
     volumes:
-      - ./heartbeat/heartbeat.py:/usr/local/bin/heartbeat.py
-      - ./wait-for-rabbitmq.sh:/usr/local/bin/wait-for-rabbitmq.sh
+      - ./volumes/heartbeat/heartbeat.py:/usr/local/bin/heartbeat.py
     environment:
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
       - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
@@ -106,4 +109,5 @@ services:
     command:
       - "sh"
       - "-c"
-      - "pip install pika && /usr/local/bin/wait-for-rabbitmq.sh && pip install mysql-connector-python && python3 /usr/local/bin/heartbeat.py"
+      - "pip install pika && pip install mysql-connector-python && python3 /usr/local/bin/heartbeat.py"
+    restart: on-failure
