@@ -54,7 +54,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
+          port: 60022
           script: |
             cd ~/attendify/attendify-frontend
             git pull origin main
