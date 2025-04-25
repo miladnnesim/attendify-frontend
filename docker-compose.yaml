@@ -1,3 +1,9 @@
+networks:
+  attendify_net:
+    driver: bridge
+  frontend_net:
+    driver: bridge
+
 services:
   wordpress:
     env_file: ./.env
@@ -19,6 +25,9 @@ services:
       - WORDPRESS_DB_NAME=${LOCAL_DB_NAME}
       - WORDPRESS_TABLEPREFIX=wp
       - WORDPRESS_DEBUG=1
+    networks:
+      - attendify_net
+      - frontend_net
 
   db:
     env_file: ./.env
@@ -28,6 +37,8 @@ services:
       - MYSQL_DATABASE=${LOCAL_DB_NAME}
     volumes:
       - ./volumes/.docker/mysql-data:/var/lib/mysql
+    networks:
+      - frontend_net
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
@@ -38,6 +49,8 @@ services:
       - PMA_USER=${LOCAL_DB_USER}
       - PMA_PASSWORD=${LOCAL_DB_PASSWORD}
       - PMA_ARBITRARY=1
+    networks:
+      - frontend_net
 
   rabbitmq:
     image: rabbitmq:4-management
@@ -54,6 +67,9 @@ services:
       - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
     profiles:
       - dev
+    networks:
+      - attendify_net
+      - frontend_net
 
   python:
     env_file: ./.env
@@ -72,6 +88,9 @@ services:
     restart: on-failure
     profiles:
       - dev
+    networks:
+      - attendify_net
+      - frontend_net
 
   consumer-user:
     env_file: ./.env
@@ -91,8 +110,10 @@ services:
     command: php /var/www/html/rabbitmq/consumer.php
     depends_on:
       - db
-      - rabbitmq
     restart: always
+    networks:
+      - attendify_net
+      - frontend_net
 
   heartbeat:
     env_file: ./.env
@@ -104,10 +125,12 @@ services:
       - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
       - LOCAL_DB_NAME=${LOCAL_DB_NAME}
     depends_on:
-      - rabbitmq
       - db
     command:
       - "sh"
       - "-c"
       - "pip install pika && pip install mysql-connector-python && python3 /usr/local/bin/heartbeat.py"
     restart: on-failure
+    networks:
+      - attendify_net
+      - frontend_net
