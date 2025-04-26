@@ -1,10 +1,12 @@
 import socket
 import time
 import logging
+import os
 import xml.etree.ElementTree as ET
-from datetime import datetime
-import xml.dom.minidom
+import xml.dom.minidom  # Voor het mooi maken van de XML
 import json
+import pika
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -12,8 +14,14 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 # Docker socket
 DOCKER_SOCKET = '/var/run/docker.sock'
 
+# RabbitMQ connection parameters
+RABBITMQ_HOST = 'rabbitmq'
+RABBITMQ_PORT = 5672
+RABBITMQ_USERNAME = 'attendify'
+RABBITMQ_PASSWORD = os.environ.get('RABBITMQ_PASSWORD', 'uXe5u1oWkh32JyLA')  # Default voor testen
+RABBITMQ_VHOST = 'attendify'
+
 # Heartbeat-specific parameters
-SENDER = 'Frontend'
 EXCHANGE_NAME = 'monitoring'
 ROUTING_KEY = 'monitoring.heartbeat'
 
@@ -45,7 +53,7 @@ def check_service_status(container_name):
         )
 
         client.sendall(request.encode())
-        client.settimeout(2)  # Max 2 seconden wachten per recv()
+        client.settimeout(2)
 
         response = b''
         try:
@@ -55,18 +63,16 @@ def check_service_status(container_name):
                     break
                 response += chunk
         except socket.timeout:
-            pass  # Klaar met lezen na timeout
+            pass
 
         response = response.decode('utf-8')
 
-        # Split headers en body
         parts = response.split('\r\n\r\n', 1)
         if len(parts) != 2:
             logging.error(f"Invalid HTTP response from Docker when checking {container_name}")
             return False
         headers, body = parts
 
-        # Zoek eerste { en laatste }
         start = body.find('{')
         end = body.rfind('}') + 1
         json_data = body[start:end]
@@ -83,40 +89,63 @@ def check_service_status(container_name):
     finally:
         client.close()
 
-def create_heartbeat_message(container_name, status):
-    """Maak een heartbeat XML bericht volgens de opgegeven XSD"""
+def create_heartbeat_message(container_name):
+    """Maak een heartbeat XML bericht volgens XSD schema met containernaam als sender"""
     root = ET.Element('heartbeat')
-    
-    sender_elem = ET.SubElement(root, 'sender')
-    sender_elem.text = SENDER
-
-    timestamp_elem = ET.SubElement(root, 'timestamp')
-    timestamp_elem.text = str(int(time.time() * 1000))  # Milliseconds since epoch als long
+    ET.SubElement(root, 'sender').text = container_name  # Gebruik containernaam als sender
+    # Unix timestamp in milliseconden
+    timestamp_ms = int(time.time() * 1000)
+    ET.SubElement(root, 'timestamp').text = str(timestamp_ms)
 
     rough_string = ET.tostring(root, 'utf-8')
-    reparsed = xml.dom.minidom.parseString(rough_string)
+    reparsed = xml.dom.minidom.parseString(rough_string)  # Zorgt ervoor dat XML netjes geformatteerd is
     pretty_xml = reparsed.toprettyxml(indent="  ")
-    return pretty_xml.encode('utf-8')  # Encode naar bytes voor RabbitMQ
+    return pretty_xml.encode('utf-8')  # Encode voor verzending
 
 def main():
+    credentials = pika.PlainCredentials(username=RABBITMQ_USERNAME, password=RABBITMQ_PASSWORD)
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            port=RABBITMQ_PORT,
+            credentials=credentials,
+            virtual_host=RABBITMQ_VHOST
+        )
+    )
+    channel = connection.channel()
+
     logging.info(f"Starting heartbeat monitor for services: {[service[0] for service in SERVICES]}")
 
     try:
         while True:
+            all_running = True
             for container_name, port in SERVICES:
                 status = check_service_status(container_name)
-                message = create_heartbeat_message(container_name, status)
-                
+                if not status:
+                    all_running = False
                 color = GREEN if status else RED
                 status_text = f"{color}{'UP' if status else 'DOWN'}{RESET}"
-                logging.info(f"Heartbeat sent for {container_name} - Status: {status_text}")
-                
-                # Hier zou je het message naar RabbitMQ sturen als je wilt
-                # Bijvoorbeeld: channel.basic_publish(exchange=EXCHANGE_NAME, routing_key=ROUTING_KEY, body=message)
-                
-            time.sleep(1)  # Elke 1 seconde checken
+                logging.info(f"Heartbeat check for {container_name} - Status: {status_text}")
+
+                if status:
+                    message = create_heartbeat_message(container_name)  # Maak het bericht met containernaam als sender
+                    channel.basic_publish(
+                        exchange=EXCHANGE_NAME,
+                        routing_key=ROUTING_KEY,
+                        body=message,
+                        properties=pika.BasicProperties(delivery_mode=2)  # Maakt berichten persistent
+                    )
+                    logging.info(f"{GREEN}Sent heartbeat for {container_name}:{RESET} {message.decode('utf-8')}")
+            
+            # Alleen als alles goed is, sturen we heartbeat
+            if not all_running:
+                logging.info(f"{RED}Skipping heartbeat send: one or more containers DOWN{RESET}")
+
+            time.sleep(1)  # Wacht 1 seconde
     except KeyboardInterrupt:
         logging.info("Heartbeat monitor gestopt door gebruiker")
+    finally:
+        connection.close()
 
 if __name__ == "__main__":
     main()
