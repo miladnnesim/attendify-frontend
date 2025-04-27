@@ -36,10 +36,10 @@ class RabbitMQ_Consumer {
         for ($i = 0; $i < $maxRetries; $i++) {
             try {
                 $this->connection = new AMQPStreamConnection(
-                    'rabbitmq', # naam container
+                    'rabbitmq',
                     getenv('RABBITMQ_AMQP_PORT'),
                     getenv('RABBITMQ_HOST'),
-                    getenv('RABBITMQ_PASSWORD'),# mogelijk dat de host en user door elkaar zijn
+                    getenv('RABBITMQ_PASSWORD'),
                     getenv('RABBITMQ_USER')
                 );
                 $this->channel = $this->connection->channel();
@@ -47,7 +47,7 @@ class RabbitMQ_Consumer {
                 return;
             } catch (AMQPIOException $e) {
                 if ($i === $maxRetries - 1) {
-                    error_log("Kon geen verbinding maken met RabbitMQ: " . $e->getMessage());
+                    error_log("Could not connect to RabbitMQ: " . $e->getMessage());
                     throw $e;
                 }
                 error_log("Retrying RabbitMQ connection ($i/$maxRetries)...");
@@ -65,7 +65,7 @@ class RabbitMQ_Consumer {
             try {
                 $xml = simplexml_load_string($msg->body);
                 if (!$xml) {
-                    throw new Exception("Ongeldig XML-formaat");
+                    throw new Exception("Invalid XML format");
                 }
 
                 $sender = (string)$xml->info->sender;
@@ -74,7 +74,7 @@ class RabbitMQ_Consumer {
                     return;
                 }
 
-                $this->handleMessage($msg);
+                $this->handleMessage($msg, $sender);
                 $msg->ack();
             } catch (Exception $e) {
                 error_log("[ERROR] " . $e->getMessage());
@@ -90,96 +90,76 @@ class RabbitMQ_Consumer {
         }
     }
 
-    private function handleMessage(AMQPMessage $msg) {
+    private function handleMessage(AMQPMessage $msg, $sender) {
         $xml = simplexml_load_string($msg->body);
         if (!$xml) {
-            throw new Exception("Ongeldig XML-formaat");
+            throw new Exception("Invalid XML format");
         }
 
         $operation = (string)$xml->info->operation;
         $userNode = $xml->user;
         $email = $this->sanitizeField($userNode->email);
 
+        // Generate unique user ID based on the email or use a specific strategy
+        $userIdFromMessage = $this->generateUserId($email);
+
         switch ($operation) {
             case 'create':
-                $this->createUser($userNode);
+                $this->createUser($userNode, $sender, $userIdFromMessage);
                 break;
             case 'update':
-                $this->updateUser($email, $userNode);
+                $this->updateUser($userIdFromMessage, $userNode);
                 break;
             case 'delete':
-                $this->deleteUser($email);
+                $this->deleteUser($userIdFromMessage);
                 break;
             default:
-                throw new Exception("Onbekende operatie: $operation");
+                throw new Exception("Unknown operation: $operation");
         }
     }
 
-    private function createUser(SimpleXMLElement $userNode) {
+    private function generateUserId($email) {
+        // Generate a unique user ID based on the email (or use another strategy)
+        return md5(strtolower(trim($email)));
+    }
+
+    private function createUser(SimpleXMLElement $userNode, $sender, $generatedUserId) {
         $email = $this->sanitizeField($userNode->email);
         $display_name = $this->sanitizeField($userNode->first_name . ' ' . $userNode->last_name);
-        $userIdFromMessage = (int)$userNode->id;
 
-        error_log("Received user ID from message: $userIdFromMessage");
+        // Check if user already exists by generated user ID
+        $checkUserIdQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_login = :user_login LIMIT 1";
+        $checkUserIdStmt = $this->db->prepare($checkUserIdQuery);
+        $checkUserIdStmt->execute([':user_login' => $generatedUserId]);
+        $existingUserById = $checkUserIdStmt->fetch(PDO::FETCH_ASSOC);
 
-        $checkEmailQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_email = :user_email LIMIT 1";
-        $checkEmailStmt = $this->db->prepare($checkEmailQuery);
-        $checkEmailStmt->execute([':user_email' => $email]);
-        $existingUserByEmail = $checkEmailStmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($existingUserByEmail) {
-            error_log("User with email '$email' already exists with ID: " . $existingUserByEmail['ID'] . ". Skipping creation.");
+        if ($existingUserById) {
+            error_log("User with generated ID '$generatedUserId' already exists. Skipping creation.");
             return;
         }
 
-        if ($userIdFromMessage > 0) {
-            $checkIdQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE ID = :user_id LIMIT 1";
-            $checkIdStmt = $this->db->prepare($checkIdQuery);
-            $checkIdStmt->execute([':user_id' => $userIdFromMessage]);
-            $existingUserById = $checkIdStmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($existingUserById) {
-                error_log("User with ID '$userIdFromMessage' already exists. Skipping creation.");
-                return;
-            }
+        // Password from CRM/Odoo
+        $password = (string)$userNode->password;
+        if (empty($password)) {
+            throw new Exception("No password provided in user.register message from CRM/Odoo");
         }
 
-        if (isset($userNode->password) && !empty($userNode->password)) {
-            $password = (string)$userNode->password;
-            error_log("Received password for user $email: $password");
-        } else {
-            throw new Exception("No password provided in user.register message from Fosbilling");
-        }
+        // Insert new user into database
+        $query = "INSERT INTO {$this->table_prefix}_users
+            (user_login, user_pass, user_email, user_registered, display_name)
+            VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name)";
+        $stmt = $this->db->prepare($query);
+        $stmt->execute([
+            ':user_login' => $generatedUserId,
+            ':user_pass' => $password,
+            ':user_email' => $email,
+            ':display_name' => $display_name
+        ]);
 
-        if ($userIdFromMessage > 0) {
-            $query = "INSERT INTO {$this->table_prefix}_users 
-                      (ID, user_login, user_pass, user_email, user Registered, display_name)
-                      VALUES (:user_id, :user_login, :user_pass, :user_email, NOW(), :display_name)";
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([
-                ':user_id' => $userIdFromMessage,
-                ':user_login' => $email,
-                ':user_pass' => $password,
-                ':user_email' => $email,
-                ':display_name' => $display_name
-            ]);
-            $user_id = $userIdFromMessage;
-            error_log("Inserted user with specified ID: $user_id");
-        } else {
-            $query = "INSERT INTO {$this->table_prefix}_users 
-                      (user_login, user_pass, user_email, user_registered, display_name)
-                      VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name)";
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([
-                ':user_login' => $email,
-                ':user_pass' => $password,
-                ':user_email' => $email,
-                ':display_name' => $display_name
-            ]);
-            $user_id = $this->db->lastInsertId();
-            error_log("Inserted user with auto-increment ID: $user_id");
-        }
+        $user_id = $this->db->lastInsertId();
+        error_log("Inserted user with generated ID: $generatedUserId");
 
+        // Insert user meta fields
         $metaFields = [
             'nickname' => $email,
             'first_name' => $this->sanitizeField($userNode->first_name),
@@ -190,28 +170,12 @@ class RabbitMQ_Consumer {
             'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}'
         ];
 
-        $umFields = [
-            'user_title' => $this->sanitizeField($userNode->title ?? ''),
-            'street_name' => $this->sanitizeField($userNode->address->street ?? ''),
-            'bus_nr' => $this->sanitizeField($userNode->address->bus_number ?? ''),
-            'city' => $this->sanitizeField($userNode->address->city ?? ''),
-            'province' => $this->sanitizeField($userNode->address->province ?? ''),
-            'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
-            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? '')
-        ];
-
-        $allFields = array_merge($metaFields, $umFields);
-        $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value) 
+        $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
                       VALUES (:user_id, :meta_key, :meta_value)";
         $metaStmt = $this->db->prepare($metaQuery);
 
-        foreach ($allFields as $key => $value) {
-            if (empty($key)) {
-                error_log("Skipping empty meta_key for user $user_id");
-                continue;
-            }
-            if ($value !== '' && $value !== null) {
-                error_log("Adding meta for user $user_id: $key = $value");
+        foreach ($metaFields as $key => $value) {
+            if (!empty($key)) {
                 $metaStmt->execute([
                     ':user_id' => $user_id,
                     ':meta_key' => $key,
@@ -220,126 +184,60 @@ class RabbitMQ_Consumer {
             }
         }
 
-        $umQuery = "INSERT INTO {$this->table_prefix}_um_metadata (user_id, um_key, um_value) 
-                    VALUES (:user_id, :um_key, :um_value)";
-        $umStmt = $this->db->prepare($umQuery);
-        foreach ($umFields as $key => $value) {
-            if (empty($key)) {
-                error_log("Skipping empty UM meta_key for user $user_id");
-                continue;
-            }
-            if ($value !== '' && $value !== null) {
-                $umStmt->execute([
-                    ':user_id' => $user_id,
-                    ':um_key' => $key,
-                    ':um_value' => $value
-                ]);
-            }
-        }
-
-        error_log("Created user with ID: $user_id, set role to 'subscriber' and account_status to approved");
+        error_log("Created user with generated ID: $generatedUserId, set role to 'subscriber' and account_status to approved");
     }
 
-    private function updateUser(string $email, SimpleXMLElement $userNode) {
-        $checkQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_email = :user_email";
+    private function updateUser($generatedUserId, SimpleXMLElement $userNode) {
+        $checkQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_login = :user_login";
         $checkStmt = $this->db->prepare($checkQuery);
-        $checkStmt->execute([':user_email' => $email]);
+        $checkStmt->execute([':user_login' => $generatedUserId]);
         $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
         if (!$user) {
-            throw new Exception("Gebruiker met e-mail $email niet gevonden");
+            throw new Exception("User with generated ID $generatedUserId not found");
         }
 
         $userId = $user['ID'];
 
-        $query = "UPDATE {$this->table_prefix}_users 
+        $query = "UPDATE {$this->table_prefix}_users
                   SET user_email = :user_email, user_login = :user_login";
         $params = [
-            ':user_email' => $email,
-            ':user_login' => $email,
-            ':user_email_where' => $email
+            ':user_email' => $userNode->email,
+            ':user_login' => $generatedUserId
         ];
 
         if (isset($userNode->password) && !empty($userNode->password)) {
             $password = (string)$userNode->password;
             $query .= ", user_pass = :user_pass";
             $params[':user_pass'] = $password;
-            error_log("Received password for user update email $email: $password");
         }
 
-        $query .= " WHERE user_email = :user_email_where";
+        $query .= " WHERE user_login = :user_login";
         $stmt = $this->db->prepare($query);
         $stmt->execute($params);
 
-        $updateFields = [
-            'first_name' => $this->sanitizeField($userNode->first_name),
-            'last_name' => $this->sanitizeField($userNode->last_name),
-            'phone_number' => $this->sanitizeField($userNode->phone_number),
-            'birth_date' => $this->sanitizeField($userNode->date_of_birth),
-            'user_title' => $this->sanitizeField($userNode->title),
-            'street_name' => $this->sanitizeField($userNode->address->street ?? ''),
-            'bus_nr' => $this->sanitizeField($userNode->address->bus_number ?? ''),
-            'city' => $this->sanitizeField($userNode->address->city ?? ''),
-            'province' => $this->sanitizeField($userNode->address->province ?? ''),
-            'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
-            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? '')
-        ];
-
-        $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
-                      VALUES (:user_id, :meta_key, :meta_value)
-                      ON DUPLICATE KEY UPDATE meta_value = :meta_value";
-        $metaStmt = $this->db->prepare($metaQuery);
-
-        foreach ($updateFields as $key => $value) {
-            if ($value !== '' && $value !== null) {
-                $metaStmt->execute([
-                    ':user_id' => $userId,
-                    ':meta_key' => $key,
-                    ':meta_value' => $value
-                ]);
-            }
-        }
-
-        $umQuery = "INSERT INTO {$this->table_prefix}_um_metadata (user_id, um_key, um_value)
-                    VALUES (:user_id, :um_key, :um_value)
-                    ON DUPLICATE KEY UPDATE um_value = :um_value";
-        $umStmt = $this->db->prepare($umQuery);
-        foreach ($updateFields as $key => $value) {
-            if ($value !== '' && $value !== null) {
-                $umStmt->execute([
-                    ':user_id' => $userId,
-                    ':um_key' => $key,
-                    ':um_value' => $value
-                ]);
-            }
-        }
-
-        error_log("Updated user with email: $email (ID: $userId)");
+        error_log("Updated user with generated ID: $generatedUserId");
     }
 
-    private function deleteUser(string $email) {
-        $checkQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_email = :user_email";
+    private function deleteUser($generatedUserId) {
+        $checkQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_login = :user_login";
         $checkStmt = $this->db->prepare($checkQuery);
-        $checkStmt->execute([':user_email' => $email]);
+        $checkStmt->execute([':user_login' => $generatedUserId]);
         $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
         if (!$user) {
-            throw new Exception("Gebruiker met e-mail $email niet gevonden");
+            throw new Exception("User with generated ID $generatedUserId not found");
         }
 
         $userId = $user['ID'];
 
-        $query = "DELETE FROM {$this->table_prefix}_users WHERE user_email = :user_email";
+        $query = "DELETE FROM {$this->table_prefix}_users WHERE user_login = :user_login";
         $stmt = $this->db->prepare($query);
-        $stmt->execute([':user_email' => $email]);
+        $stmt->execute([':user_login' => $generatedUserId]);
 
         $metaQuery = "DELETE FROM {$this->table_prefix}_usermeta WHERE user_id = :user_id";
         $metaStmt = $this->db->prepare($metaQuery);
         $metaStmt->execute([':user_id' => $userId]);
 
-        $umQuery = "DELETE FROM {$this->table_prefix}_um_metadata WHERE user_id = :user_id";
-        $umStmt = $this->db->prepare($umQuery);
-        $umStmt->execute([':user_id' => $userId]);
-
-        error_log("Deleted user with email: $email (ID: $userId)");
+        error_log("Deleted user with generated ID: $generatedUserId");
     }
 
     private function sanitizeField($value) {
