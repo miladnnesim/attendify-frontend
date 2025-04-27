@@ -136,7 +136,7 @@ channel.queue_bind(queue="mailing.user", exchange="user-management", routing_key
 channel.queue_bind(queue="mailing.user", exchange="user-management", routing_key="user.delete")
 
 channel.queue_declare(queue='mailing.mail', durable=True)
-channel.queue_bind(queue="mailing.mail", exchange="user-management", routing_key="user.register")
+channel.queue_bind(queue="mailing.mail", exchange="user-management", routing_key="user.passwordGenerated")
 channel.queue_bind(queue="mailing.mail", exchange="user-management", routing_key="user.passwordReset")
 channel.queue_bind(queue="mailing.mail", exchange="event", routing_key="event.register")
 channel.queue_bind(queue="mailing.mail", exchange="event", routing_key="event.unregister")
@@ -197,6 +197,7 @@ channel.queue_bind(queue="monitoring.retry", exchange="dlx", routing_key="retry.
 channel.queue_declare(queue='frontend.user', durable=True)
 channel.queue_bind(queue="frontend.user", exchange="user-management", routing_key="user.register")
 channel.queue_bind(queue="frontend.user", exchange="user-management", routing_key="user.unregister")
+channel.queue_bind(queue="frontend.user", exchange="user-management", routing_key="user.update")
 channel.queue_bind(queue="frontend.user", exchange="user-management", routing_key="user.delete")
 
 channel.queue_declare(queue='frontend.invoice', durable=True)
