@@ -1,4 +1,20 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: some-rabbit
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_HOST}
+    ports:
+      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}"       # bijv. 15672:15672 (UI)
+      - "${RABBITMQ_AMQP_PORT}:${RABBITMQ_AMQP_PORT}" # bijv. 5672:5672 (AMQP)
+    volumes:
+      - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
+    networks:
+      - attendify_net
+      - frontend_net
   wordpress:
     env_file: ./.env
     build:
