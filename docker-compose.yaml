@@ -1,6 +1,6 @@
 networks:
   attendify_net:
-    driver: bridge
+    external: true
   frontend_net:
     driver: bridge
 
