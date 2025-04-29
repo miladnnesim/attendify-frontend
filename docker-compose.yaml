@@ -1,4 +1,22 @@
 services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: some-rabbit
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_HOST}
+    ports:
+      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}"
+      - "${RABBITMQ_AMQP_PORT}:${RABBITMQ_AMQP_PORT}"
+    volumes:
+      - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
+    profiles:
+      - dev
+    networks:
+      - attendify_net
+      - frontend_net
   wordpress:
     env_file: ./.env
     build:
@@ -44,25 +62,6 @@ services:
       - PMA_PASSWORD=${LOCAL_DB_PASSWORD}
       - PMA_ARBITRARY=1
     networks:
-      - frontend_net
-
-  rabbitmq:
-    image: rabbitmq:4-management
-    container_name: some-rabbit
-    restart: always
-    environment:
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_HOST}
-    ports:
-      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}"
-      - "${RABBITMQ_AMQP_PORT}:${RABBITMQ_AMQP_PORT}"
-    volumes:
-      - /home/frontend/volumes/rabbitmq/data:/var/lib/rabbitmq
-    profiles:
-      - dev
-    networks:
-      - attendify_net
       - frontend_net
 
   python:
