@@ -98,25 +98,30 @@ class RabbitMQ_Consumer {
         if (!$xml) {
             throw new Exception("Ongeldig XML-formaat");
         }
-   
+
         $operation = (string)$xml->info->operation;
         $userNode = $xml->user;
-        $email = $this->sanitizeField($userNode->email);
-   
+        $uid = $this->sanitizeField($userNode->uid);
+    
+        if (empty($uid)) {
+            throw new Exception("UID ontbreekt in bericht");
+        }
+    
         switch ($operation) {
             case 'create':
                 $this->createUser($userNode, $sender);
                 break;
             case 'update':
-                $this->updateUser($email, $userNode);
+                $this->updateUser($uid, $userNode);
                 break;
             case 'delete':
-                $this->deleteUser($email);
+                $this->deleteUser($uid);
                 break;
             default:
                 throw new Exception("Onbekende operatie: $operation");
         }
     }
+    
     private function sendToMailingQueue($messageData) {
         $exchange = 'user-management';
         $queue = 'mailing.mail';
@@ -132,135 +137,119 @@ class RabbitMQ_Consumer {
     private function createUser(SimpleXMLElement $userNode, $sender) {
         $email = $this->sanitizeField($userNode->email);
         $display_name = $this->sanitizeField($userNode->first_name . ' ' . $userNode->last_name);
-        $userIdFromMessage = (int)$userNode->id;
-   
-        error_log("Received user ID from message: $userIdFromMessage");
-   
-        // Check if user already exists by email
-        $checkEmailQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_email = :user_email LIMIT 1";
-        $checkEmailStmt = $this->db->prepare($checkEmailQuery);
-        $checkEmailStmt->execute([':user_email' => $email]);
-        $existingUserByEmail = $checkEmailStmt->fetch(PDO::FETCH_ASSOC);
-   
-        if ($existingUserByEmail) {
-            error_log("User with email '$email' already exists with ID: " . $existingUserByEmail['ID'] . ". Skipping creation.");
+        $uid = $this->sanitizeField($userNode->uid); // <-- UID ophalen uit XML
+        
+        if (empty($uid)) {
+            throw new Exception("UID is verplicht bij create operatie");
+        }
+    
+        error_log("Received UID from message: $uid");
+    
+        // Check if user already exists by UID
+        $checkUidQuery = "SELECT user_id FROM {$this->table_prefix}_usermeta WHERE meta_key = 'uid' AND meta_value = :uid LIMIT 1";
+        $checkUidStmt = $this->db->prepare($checkUidQuery);
+        $checkUidStmt->execute([':uid' => $uid]);
+        $existingUserByUid = $checkUidStmt->fetch(PDO::FETCH_ASSOC);
+    
+        if ($existingUserByUid) {
+            error_log("User with UID '$uid' already exists with ID: " . $existingUserByUid['user_id'] . ". Skipping creation.");
             return;
         }
-   
-        // Check if user ID already exists
-        if ($userIdFromMessage > 0) {
-            $checkIdQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE ID = :user_id LIMIT 1";
-            $checkIdStmt = $this->db->prepare($checkIdQuery);
-            $checkIdStmt->execute([':user_id' => $userIdFromMessage]);
-            $existingUserById = $checkIdStmt->fetch(PDO::FETCH_ASSOC);
-   
-            if ($existingUserById) {
-                error_log("User with ID '$userIdFromMessage' already exists. Skipping creation.");
-                return;
+    
+        // Password ophalen
+        $password = (string)$userNode->password;
+        if (empty($password)) {
+            throw new Exception("No password provided in user.register message from CRM/Odoo");
+        }
+    
+        $hashed_activation_key = null;
+    
+        if ($sender == 'CRM' || $sender == 'Odoo') {
+            $wp_host = getenv('WORDPRESS_HOST');
+            $api_url = "http://wordpress:80/?rest_route=/myapiv2/set-activation-key";
+            error_log("API URL: " . $api_url);
+    
+            $shared_secret = getenv('MY_API_SHARED_SECRET');
+            if (!$shared_secret) {
+                error_log('Shared secret not set in environment variables!');
+                throw new Exception('Shared secret not configured');
+            }
+    
+            $random_bytes = random_bytes(16);
+            $activation_key = bin2hex($random_bytes);
+    
+            $data = json_encode(['activation_key' => $activation_key]);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $api_url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'X-Shared-Secret: ' . $shared_secret,
+                'Content-Type: application/json',
+            ]);
+            $response = curl_exec($ch);
+            if (curl_errno($ch)) {
+                error_log('cURL error: ' . curl_error($ch));
+                throw new Exception('cURL error: ' . curl_error($ch));
+            }
+            curl_close($ch);
+    
+            $response_data = json_decode($response, true);
+            if (isset($response_data['hashed_activation_key'])) {
+                $hashed_activation_key = $response_data['hashed_activation_key'];
+                $this->sendToMailingQueue($wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email));
+                echo 'Hashed Activation Key: ' . $hashed_activation_key;
+            } else {
+                error_log('No hashed activation key found in response');
+                throw new Exception('Failed to retrieve hashed activation key');
             }
         }
-   
-        // Password from CRM/Odoo
-        // Password ophalen
-    $password = (string)$userNode->password;
-    if (empty($password)) {
-       throw new Exception("No password provided in user.register message from CRM/Odoo");
-    }
- 
-    $hashed_activation_key = null; // Alleen vullen als nodig
- 
-    if ($sender == 'CRM' || $sender == 'Odoo') {
-        $wp_host = getenv('WORDPRESS_HOST') ?: 'Localhost:30025';
-        $api_url = $wp_host . "/?rest_route=/myapiv2/set-activation-key";
-     error_log("api url :" . $api_url);
- 
-     $shared_secret = getenv('MY_API_SHARED_SECRET');
-     if (!$shared_secret) {
-         error_log('Shared secret not set in environment variables!');
-            throw new Exception('Shared secret not configured');
-      }
- 
-     $random_bytes = random_bytes(16);
-        $activation_key = bin2hex($random_bytes);
- 
-        $data = json_encode(['activation_key' => $activation_key]);
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $api_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-           'X-Shared-Secret: ' . $shared_secret,
-           'Content-Type: application/json',
-        ]);
-        $response = curl_exec($ch);
-        if (curl_errno($ch)) {
-        error_log('cURL error: ' . curl_error($ch));
-        throw new Exception('cURL error: ' . curl_error($ch));
-        }
-        curl_close($ch);
- 
-        $response_data = json_decode($response, true);
-        if (isset($response_data['hashed_activation_key'])) {
-        $hashed_activation_key = $response_data['hashed_activation_key'];
-        $this->sendToMailingQueue($wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email));
-        echo 'Hashed Activation Key: ' . $hashed_activation_key;
+    
+        if ($hashed_activation_key !== null) {
+            $query = "INSERT INTO {$this->table_prefix}_users
+                      (user_login, user_pass, user_email, user_registered, display_name, user_activation_key)
+                      VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name, :user_activation_key)";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([
+                ':user_login' => $email,
+                ':user_pass' => $password,
+                ':user_email' => $email,
+                ':display_name' => $display_name,
+                ':user_activation_key' => $hashed_activation_key
+            ]);
         } else {
-        error_log('No hashed activation key found in response');
-        throw new Exception('Failed to retrieve hashed activation key');
+            $query = "INSERT INTO {$this->table_prefix}_users
+                      (user_login, user_pass, user_email, user_registered, display_name)
+                      VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name)";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([
+                ':user_login' => $email,
+                ':user_pass' => $password,
+                ':user_email' => $email,
+                ':display_name' => $display_name
+            ]);
         }
-    }
- 
-// Nu controleren of je een activation key hebt of niet
-    if ($hashed_activation_key !== null) {
-    // INSERT MET activation key
-        $query = "INSERT INTO {$this->table_prefix}_users
-        (user_login, user_pass, user_email, user_registered, display_name, user_activation_key)
-        VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name, :user_activation_key)";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute([
-        ':user_login' => $email,
-        ':user_pass' => $password,
-        ':user_email' => $email,
-        ':display_name' => $display_name,
-        ':user_activation_key' => $hashed_activation_key
-        ]);
-    } else {
-    // INSERT ZONDER activation key
-        $query = "INSERT INTO {$this->table_prefix}_users
-        (user_login, user_pass, user_email, user_registered, display_name)
-        VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name)";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute([
-        ':user_login' => $email,
-        ':user_pass' => $password,
-        ':user_email' => $email,
-        ':display_name' => $display_name
-        ]);
-    }
- 
+    
         $user_id = $this->db->lastInsertId();
         error_log("Inserted user with auto-increment ID: $user_id");
- 
-   
-        // Check if the sender is CRM or Odoo and call the WordPress API
-       
-   
+    
         // Insert user meta fields
         $metaFields = [
+            'uid' => $uid, // <-- Extra: hier UID opslaan in usermeta
             'nickname' => $email,
             'first_name' => $this->sanitizeField($userNode->first_name),
             'last_name' => $this->sanitizeField($userNode->last_name),
             'birth_date' => $this->sanitizeField($userNode->date_of_birth ?? ''),
             'phone_number' => $this->sanitizeField($userNode->phone_number ?? ''),
             'account_status' => 'approved',
-            'wp_capabilities' => 'a:1:{s:10:\"subscriber\";b:1;}'
+            'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}'
         ];
-   
+    
         $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
                       VALUES (:user_id, :meta_key, :meta_value)";
         $metaStmt = $this->db->prepare($metaQuery);
-   
+    
         foreach ($metaFields as $key => $value) {
             if (!empty($key)) {
                 $metaStmt->execute([
@@ -270,9 +259,10 @@ class RabbitMQ_Consumer {
                 ]);
             }
         }
-   
-        error_log("Created user with ID: $user_id, set role to 'subscriber' and account_status to approved");
+    
+        error_log("Created user with ID: $user_id, stored UID $uid, set role to 'subscriber' and account_status to approved");
     }
+    
    
     private function makeHttpRequest($url, $args) {
         $ch = curl_init($url);
@@ -305,17 +295,23 @@ class RabbitMQ_Consumer {
     }
    
  
-    private function updateUser(string $email, SimpleXMLElement $userNode) {
-        $checkQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_email = :user_email";
+    private function updateUser(string $uid, SimpleXMLElement $userNode) {
+        $checkQuery = "SELECT u.ID 
+        FROM {$this->table_prefix}_users u
+        INNER JOIN {$this->table_prefix}_usermeta m ON u.ID = m.user_id
+        WHERE m.meta_key = 'unified_user_id' AND m.meta_value = :uid";
+
         $checkStmt = $this->db->prepare($checkQuery);
-        $checkStmt->execute([':user_email' => $email]);
+        $checkStmt->execute([':uid' => $uid]);
         $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
+    
         if (!$user) {
-            throw new Exception("Gebruiker met e-mail $email niet gevonden");
+            throw new Exception("Gebruiker met UID $uid niet gevonden");
         }
- 
+    
         $userId = $user['ID'];
- 
+        $email = $this->sanitizeField($userNode->email);
+    
         $query = "UPDATE {$this->table_prefix}_users
                   SET user_email = :user_email, user_login = :user_login";
         $params = [
@@ -323,18 +319,19 @@ class RabbitMQ_Consumer {
             ':user_login' => $email,
             ':user_email_where' => $email
         ];
- 
+    
         if (isset($userNode->password) && !empty($userNode->password)) {
             $password = (string)$userNode->password;
             $query .= ", user_pass = :user_pass";
             $params[':user_pass'] = $password;
-            error_log("Received password for user update email $email: $password");
+            error_log("Received password for user update UID $uid: $password");
         }
- 
-        $query .= " WHERE user_email = :user_email_where";
+    
+        $query .= " WHERE ID = :user_id";
+        $params[':user_id'] = $userId;
         $stmt = $this->db->prepare($query);
         $stmt->execute($params);
- 
+    
         $updateFields = [
             'first_name' => $this->sanitizeField($userNode->first_name),
             'last_name' => $this->sanitizeField($userNode->last_name),
@@ -348,12 +345,12 @@ class RabbitMQ_Consumer {
             'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
             'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? '')
         ];
- 
+    
         $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
                       VALUES (:user_id, :meta_key, :meta_value)
                       ON DUPLICATE KEY UPDATE meta_value = :meta_value";
         $metaStmt = $this->db->prepare($metaQuery);
- 
+    
         foreach ($updateFields as $key => $value) {
             if ($value !== '' && $value !== null) {
                 $metaStmt->execute([
@@ -363,49 +360,38 @@ class RabbitMQ_Consumer {
                 ]);
             }
         }
- 
-        $umQuery = "INSERT INTO {$this->table_prefix}_um_metadata (user_id, um_key, um_value)
-                    VALUES (:user_id, :um_key, :um_value)
-                    ON DUPLICATE KEY UPDATE um_value = :um_value";
-        $umStmt = $this->db->prepare($umQuery);
-        foreach ($updateFields as $key => $value) {
-            if ($value !== '' && $value !== null) {
-                $umStmt->execute([
-                    ':user_id' => $userId,
-                    ':um_key' => $key,
-                    ':um_value' => $value
-                ]);
-            }
-        }
- 
-        error_log("Updated user with email: $email (ID: $userId)");
+    
+        error_log("Updated user with UID: $uid (ID: $userId)");
     }
+    
  
-    private function deleteUser(string $email) {
-        $checkQuery = "SELECT ID FROM {$this->table_prefix}_users WHERE user_email = :user_email";
+    private function deleteUser(string $uid) {
+        $checkQuery = "SELECT u.ID 
+        FROM {$this->table_prefix}_users u
+        INNER JOIN {$this->table_prefix}_usermeta m ON u.ID = m.user_id
+        WHERE m.meta_key = 'unified_user_id' AND m.meta_value = :uid";
+
         $checkStmt = $this->db->prepare($checkQuery);
-        $checkStmt->execute([':user_email' => $email]);
+        $checkStmt->execute([':uid' => $uid]);
         $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
+    
         if (!$user) {
-            throw new Exception("Gebruiker met e-mail $email niet gevonden");
+            throw new Exception("Gebruiker met UID $uid niet gevonden");
         }
- 
+    
         $userId = $user['ID'];
- 
-        $query = "DELETE FROM {$this->table_prefix}_users WHERE user_email = :user_email";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute([':user_email' => $email]);
- 
-        $metaQuery = "DELETE FROM {$this->table_prefix}_usermeta WHERE user_id = :user_id";
-        $metaStmt = $this->db->prepare($metaQuery);
-        $metaStmt->execute([':user_id' => $userId]);
- 
-        $umQuery = "DELETE FROM {$this->table_prefix}_um_metadata WHERE user_id = :user_id";
-        $umStmt = $this->db->prepare($umQuery);
-        $umStmt->execute([':user_id' => $userId]);
- 
-        error_log("Deleted user with email: $email (ID: $userId)");
+    
+        $deleteMeta = "DELETE FROM {$this->table_prefix}_usermeta WHERE user_id = :user_id";
+        $stmtMeta = $this->db->prepare($deleteMeta);
+        $stmtMeta->execute([':user_id' => $userId]);
+    
+        $deleteUser = "DELETE FROM {$this->table_prefix}_users WHERE ID = :user_id";
+        $stmtUser = $this->db->prepare($deleteUser);
+        $stmtUser->execute([':user_id' => $userId]);
+    
+        error_log("Deleted user with UID: $uid (ID: $userId)");
     }
+    
  
     private function sanitizeField($value) {
         return htmlspecialchars(strip_tags((string)$value));

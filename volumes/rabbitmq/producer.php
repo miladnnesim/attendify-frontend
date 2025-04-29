@@ -58,8 +58,8 @@ class Producer {
         $customUserId = get_user_meta($user_id, 'unified_user_id', true);
         if (!$customUserId) {
             // Si l'ID unifié n'existe pas, le créer et l'enregistrer
-            $servicePrefix = 'SF';  // Exemple de préfixe
-            $customUserId = $this->generateCustomUserId($servicePrefix);  // Générer l'ID unique
+            $servicePrefix = 'WP';  // Exemple de préfixe
+            $customUserId = $servicePrefix . time();  // Générer l'ID unique basé sur le timestamp actuel
             update_user_meta($user_id, 'unified_user_id', $customUserId);  // Sauvegarder l'ID unifié dans les métadonnées
         }
     
@@ -70,7 +70,7 @@ class Producer {
         $info->addChild('operation', $operation);
     
         $user_node = $xml->addChild('user');
-        $user_node->addChild('id', $customUserId);  // Utiliser l'ID unifié ici
+        $user_node->addChild('uid', $customUserId);  // Utiliser l'ID unifié ici
     
         // Fetch user data from wp_users
         $user_email = $user->user_email;
@@ -159,7 +159,12 @@ class Producer {
         $user_node->addChild('from_company', 'false');
     
         // Convert to string
-        $xml_message = $xml->asXML();
+        $dom = new DOMDocument('1.0');
+        $dom->preserveWhiteSpace = false;
+        $dom->formatOutput = true;
+        $dom->loadXML($xml->asXML());
+        $xml_message = $dom->saveXML();
+
     
         // Controleer op dubbele boodschap
         $hash = md5($xml_message);
