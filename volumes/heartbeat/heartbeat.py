@@ -103,14 +103,26 @@ def create_heartbeat_message(container_name):
 
 def main():
     credentials = pika.PlainCredentials(username=RABBITMQ_USERNAME, password=RABBITMQ_PASSWORD)
-    connection = pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host=RABBITMQ_HOST,
-            port=RABBITMQ_PORT,
-            credentials=credentials,
-            virtual_host=RABBITMQ_VHOST
-        )
-    )
+
+    # Retry RabbitMQ verbinding (max 5 keer proberen, telkens 5 seconden wachten)
+    for i in range(5):
+        try:
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=RABBITMQ_HOST,
+                    port=RABBITMQ_PORT,
+                    credentials=credentials,
+                    virtual_host=RABBITMQ_VHOST
+                )
+            )
+            break  # Verbinding gelukt
+        except Exception as e:
+            print(f"RabbitMQ verbinding mislukt ({i+1}/5): {e}")
+            time.sleep(5)
+    else:
+        print("RabbitMQ is niet bereikbaar na 5 pogingen. Script stopt.")
+        return
+
     channel = connection.channel()
 
     logging.info(f"Starting heartbeat monitor for services: {[service[0] for service in SERVICES]}")
@@ -127,23 +139,23 @@ def main():
                 logging.info(f"Heartbeat check for {container_name} - Status: {status_text}")
 
                 if status:
-                    message = create_heartbeat_message(container_name)  # Maak het bericht met containernaam als sender
+                    message = create_heartbeat_message(container_name)
                     channel.basic_publish(
                         exchange=EXCHANGE_NAME,
                         routing_key=ROUTING_KEY,
                         body=message,
-                        properties=pika.BasicProperties(delivery_mode=2)  # Maakt berichten persistent
+                        properties=pika.BasicProperties(delivery_mode=2)
                     )
-            
-            # Alleen als alles goed is, sturen we heartbeat
+
             if not all_running:
                 logging.info(f"{RED}Skipping heartbeat send: one or more containers DOWN{RESET}")
 
-            time.sleep(1)  # Wacht 1 seconde
+            time.sleep(1)
     except KeyboardInterrupt:
         logging.info("Heartbeat monitor gestopt door gebruiker")
     finally:
         connection.close()
+
 
 if __name__ == "__main__":
     main()

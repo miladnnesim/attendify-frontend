@@ -122,6 +122,7 @@ services:
       - LOCAL_DB_NAME=${LOCAL_DB_NAME}
     depends_on:
       - db
+      - rabbitmq
     command:
       - "sh"
       - "-c"
