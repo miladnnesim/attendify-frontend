@@ -3,8 +3,10 @@ FROM php:8.1-apache
 # Installeer de vereiste PHP-extensies (PDO en AMQP)
 RUN apt-get update && apt-get install -y \
     librabbitmq-dev \
-    && (pecl list | grep -q amqp || pecl install amqp) \
-    && docker-php-ext-enable amqp \
+    && docker-php-ext-install sockets \
+    && pecl install amqp \
+    && docker-php-ext-enable sockets amqp \
     && docker-php-ext-install pdo pdo_mysql
+
 
 
