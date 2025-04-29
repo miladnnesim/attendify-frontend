@@ -306,4 +306,60 @@ function send_user_delete_to_rabbitmq($user_id) {
 }
 add_action('delete_user', 'send_user_delete_to_rabbitmq', 10, 1);
 
+add_action('init', function() {
+    if (false === getenv('MY_API_SHARED_SECRET')) {
+        error_log('Shared secret is not set in environment variables!');
+    }
+});
+
+// Register the REST API endpoint
+add_action('rest_api_init', function () {
+    register_rest_route('myapiv2', '/set-activation-key', [
+        'methods' => 'POST',
+        'callback' => 'set_activation_key',
+        'permission_callback' => 'verify_shared_secret',
+    ]);
+});
+
+// Check the shared secret from the request headers
+function verify_shared_secret(WP_REST_Request $request) {
+    $headers = $request->get_headers();
+    $env_secret = getenv('MY_API_SHARED_SECRET');
+
+    if (!$env_secret) {
+        return new WP_Error('server_error', 'Shared secret not configured on server', ['status' => 500]);
+    }
+
+    if (!isset($headers['x_shared_secret'][0])) {
+        return new WP_Error('unauthorized', 'Missing shared secret', ['status' => 401]);
+    }
+
+    $provided_secret = $headers['x_shared_secret'][0];
+    if (!hash_equals($env_secret, $provided_secret)) {
+        return new WP_Error('unauthorized', 'Invalid shared secret', ['status' => 401]);
+    }
+
+    return true;
+}
+
+// Set the activation key and return the reset link
+function set_activation_key(WP_REST_Request $request) {
+    // Récupérer les paramètres de la requête
+	$activation_key = $request->get_param('activation_key') ?: wp_generate_password(20, false);
+    $expiration = time() + (24 * 60 * 60);  // 24h expiry
+
+    // Fix: Use password_hash() for bcrypt (not wp_hash_password)
+    $hashed_key = password_hash($activation_key, PASSWORD_BCRYPT);
+
+    // Format: "timestamp:bcrypt_hash"
+    $formatted_key = $expiration . ':' . $hashed_key;
+
+    // Retourner la clé formatée
+    return rest_ensure_response([
+        'hashed_activation_key' => $formatted_key
+    ]);
+}
+
+
+
 add_action('init', 'twentytwentyfive_register_block_bindings');
