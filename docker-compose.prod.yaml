@@ -1,4 +1,3 @@
 networks:
   attendify_net:
     external: true
-    name: attendify_net
