@@ -93,13 +93,19 @@ def check_service_status(container_name):
 def create_heartbeat_message(container_name):
     """Maak een heartbeat XML bericht volgens XSD schema met containernaam als sender"""
     root = ET.Element('heartbeat')
-    ET.SubElement(root, 'sender').text = container_name  # Gebruik containernaam als sender
-    # ISO 8601 UTC timestamp
+    ET.SubElement(root, 'sender').text = container_name
     timestamp = datetime.utcnow().isoformat() + 'Z'
     ET.SubElement(root, 'timestamp').text = timestamp
 
     rough_string = ET.tostring(root, encoding='utf-8', method='xml')
-    return rough_string  # Geen extra formatting nodig, tenzij je dat wilt
+    reparsed = xml.dom.minidom.parseString(rough_string)
+    pretty_xml = reparsed.toprettyxml(indent="  ")
+
+    # Verwijder de eerste regel met XML declaration
+    pretty_xml_no_header = '\n'.join(pretty_xml.split('\n')[1:]).strip()
+    return pretty_xml_no_header.encode('utf-8')  # encode opnieuw naar bytes
+
+
 
 def main():
     credentials = pika.PlainCredentials(username=RABBITMQ_USERNAME, password=RABBITMQ_PASSWORD)
