@@ -60,18 +60,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd ~/attendify/test-environment/testing-Frontend
-
-            if [ ! -d .git ]; then
-              git clone -b test git@github.com:miladnnesim/attendify-frontend.git .
-            else
-              git remote set-url origin git@github.com:miladnnesim/attendify-frontend.git
-              git fetch origin
-              git checkout -B test origin/test
-            fi
-
+            git pull origin test
             docker compose down
-            docker compose -f docker-compose.yaml up -d --build
+            docker compose -f docker-compose.yaml -f docker-compose.test.yaml up -d --build
+
 
   deploy-prod:
     name: Deploy to Production Server
@@ -89,14 +81,6 @@ jobs:
           port: 60022
           script: |
             cd ~/attendify/attendify-frontend
-
-            if [ ! -d .git ]; then
-              git clone -b main git@github.com:miladnnesim/attendify-frontend.git .
-            else
-              git remote set-url origin git@github.com:miladnnesim/attendify-frontend.git
-              git fetch origin
-              git checkout -B main origin/main
-            fi
-
-            docker compose down
+            git pull origin main
+            docker compose down 
             docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d --build
