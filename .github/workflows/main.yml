@@ -3,9 +3,12 @@ name: WordPress CI/CD Pipeline
 on:
   push:
     branches:
+      - dev
       - main
+      - test
   pull_request:
     branches:
+      - test
       - main
 
 jobs:
@@ -44,11 +47,31 @@ jobs:
   deploy:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: ci # Alleen deployen als CI slaagt
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Alleen bij push naar main
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
 
     steps:
-      - name: Deploy via SSH
+      - name: Deploy to test via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            cd ~/attendify/test-environment/testing-Frontend/attendify-frontend
+            git pull origin test
+            docker compose down
+            docker compose -f docker-compose.yaml -f docker-compose.test.yaml up -d --build
+
+  deploy-prod:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy to production via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -58,5 +81,5 @@ jobs:
           script: |
             cd ~/attendify/attendify-frontend
             git pull origin main
-            docker compose down # Optioneel: stop bestaande containers
+            docker compose down 
             docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d --build

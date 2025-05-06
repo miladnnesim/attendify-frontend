@@ -273,6 +273,8 @@ function save_custom_fields_in_account($changes, $user_id) {
 }
 
 function send_user_data_to_rabbitmq_create($user_id, $args) {
+    sleep(2); // wacht 2 seconden
+
     try {
         $producer = new Producer();
         $producer->sendUserData($user_id, 'create');
