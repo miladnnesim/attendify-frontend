@@ -243,7 +243,8 @@ class RabbitMQ_Consumer {
             'birth_date' => $this->sanitizeField($userNode->date_of_birth ?? ''),
             'phone_number' => $this->sanitizeField($userNode->phone_number ?? ''),
             'account_status' => 'approved',
-            'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}'
+            'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}',
+            'wp_user_level' => '0'
         ];
     
         $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
@@ -300,7 +301,7 @@ class RabbitMQ_Consumer {
         FROM {$this->table_prefix}_users u
         INNER JOIN {$this->table_prefix}_usermeta m ON u.ID = m.user_id
         WHERE m.meta_key = 'uid' AND m.meta_value = :uid";
-
+    
         $checkStmt = $this->db->prepare($checkQuery);
         $checkStmt->execute([':uid' => $uid]);
         $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -342,26 +343,30 @@ class RabbitMQ_Consumer {
             'city' => $this->sanitizeField($userNode->address->city ?? ''),
             'province' => $this->sanitizeField($userNode->address->province ?? ''),
             'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
-            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? '')
+            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? ''),
+            'full_name' => trim($this->sanitizeField($userNode->first_name) . ' ' . $this->sanitizeField($userNode->last_name))
+
         ];
     
-        $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
-                      VALUES (:user_id, :meta_key, :meta_value)
-                      ON DUPLICATE KEY UPDATE meta_value = :meta_value";
-        $metaStmt = $this->db->prepare($metaQuery);
-    
         foreach ($updateFields as $key => $value) {
-            if ($value !== '' && $value !== null) {
-                $metaStmt->execute([
-                    ':user_id' => $userId,
-                    ':meta_key' => $key,
-                    ':meta_value' => $value
-                ]);
+            if ($value === '' || $value === null) continue;
+    
+            $checkMeta = $this->db->prepare("SELECT umeta_id FROM {$this->table_prefix}_usermeta WHERE user_id = :user_id AND meta_key = :meta_key");
+            $checkMeta->execute([':user_id' => $userId, ':meta_key' => $key]);
+            $exists = $checkMeta->fetchColumn();
+    
+            if ($exists) {
+                $updateMeta = $this->db->prepare("UPDATE {$this->table_prefix}_usermeta SET meta_value = :meta_value WHERE user_id = :user_id AND meta_key = :meta_key");
+                $updateMeta->execute([':meta_value' => $value, ':user_id' => $userId, ':meta_key' => $key]);
+            } else {
+                $insertMeta = $this->db->prepare("INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value) VALUES (:user_id, :meta_key, :meta_value)");
+                $insertMeta->execute([':user_id' => $userId, ':meta_key' => $key, ':meta_value' => $value]);
             }
         }
     
         error_log("Updated user with UID: $uid (ID: $userId)");
     }
+    
     
  
     private function deleteUser(string $uid) {
