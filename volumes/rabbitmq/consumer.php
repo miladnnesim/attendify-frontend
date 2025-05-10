@@ -317,7 +317,6 @@ class RabbitMQ_Consumer {
         $params = [
             ':user_email' => $email,
             ':user_login' => $email,
-            ':user_email_where' => $email
         ];
     
         if (isset($userNode->password) && !empty($userNode->password)) {

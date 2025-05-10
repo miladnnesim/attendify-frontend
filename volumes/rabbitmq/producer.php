@@ -51,11 +51,11 @@ class Producer {
             throw new Exception("User with ID $user_id not found.");
         }
 
-        $customUserId = get_user_meta($user_id, 'unified_user_id', true);
+        $customUserId = get_user_meta($user_id, 'uid', true);
         if (!$customUserId) {
             $servicePrefix = 'WP';
             $customUserId = $servicePrefix . time();
-            update_user_meta($user_id, 'unified_user_id', $customUserId);
+            update_user_meta($user_id, 'uid', $customUserId);
         }
 
         $xml = new SimpleXMLElement('<attendify/>');
