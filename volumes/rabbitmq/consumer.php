@@ -299,7 +299,7 @@ class RabbitMQ_Consumer {
         $checkQuery = "SELECT u.ID 
         FROM {$this->table_prefix}_users u
         INNER JOIN {$this->table_prefix}_usermeta m ON u.ID = m.user_id
-        WHERE m.meta_key = 'unified_user_id' AND m.meta_value = :uid";
+        WHERE m.meta_key = 'uid' AND m.meta_value = :uid";
 
         $checkStmt = $this->db->prepare($checkQuery);
         $checkStmt->execute([':uid' => $uid]);
@@ -369,7 +369,7 @@ class RabbitMQ_Consumer {
         $checkQuery = "SELECT u.ID 
         FROM {$this->table_prefix}_users u
         INNER JOIN {$this->table_prefix}_usermeta m ON u.ID = m.user_id
-        WHERE m.meta_key = 'unified_user_id' AND m.meta_value = :uid";
+        WHERE m.meta_key = 'uid' AND m.meta_value = :uid";
 
         $checkStmt = $this->db->prepare($checkQuery);
         $checkStmt->execute([':uid' => $uid]);
