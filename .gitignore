@@ -8,3 +8,5 @@ full-db-export.sql
 /volumes/vendor
 
 /volumes/docker
+
+composer.lock
