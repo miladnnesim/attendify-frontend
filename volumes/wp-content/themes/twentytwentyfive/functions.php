@@ -400,12 +400,12 @@ function render_event_session_page() {
 
             if ($is_registered) {
                 $html .= "<p class='registered'>✅ Je bent al geregistreerd voor dit event.</p>";
-                $html .= '<form method="POST" action="/unregister">';
+                $html .= '<form method="POST" action="/unregisterevent">';
                 $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
                 $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
                 $html .= '</form>';
             } else {
-                $html .= '<form method="POST" action="/register">';
+                $html .= '<form method="POST" action="/registerevent">';
                 $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
                 $html .= '<button type="submit" class="button">Registreer voor event</button>';
                 $html .= '</form>';
@@ -443,12 +443,12 @@ function render_event_session_page() {
 
                     if ($is_registered_session) {
                         $html .= "<p class='registered'>✅ Je bent al geregistreerd voor deze sessie.</p>";
-                        $html .= '<form method="POST" action="/unregister">';
+                        $html .= '<form method="POST" action="/unregisterevent">';
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
                         $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
                         $html .= '</form>';
                     } else {
-                        $html .= '<form method="POST" action="/register">';
+                        $html .= '<form method="POST" action="/registerevent">';
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
                         $html .= '<button type="submit" class="button small">Registreer voor sessie</button>';
                         $html .= '</form>';
@@ -541,7 +541,7 @@ function get_user_uid($user_id) {
 }
 
 add_action('init', function () {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && strpos($_SERVER['REQUEST_URI'], '/unregister') !== false) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && strpos($_SERVER['REQUEST_URI'], '/unregisterevent') !== false) {
         if (!is_user_logged_in()) {
             wp_die('Je moet ingelogd zijn om je registratie te annuleren.');
         }
@@ -575,7 +575,7 @@ add_action('init', function () {
 });
 
 add_action('init', function () {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && strpos($_SERVER['REQUEST_URI'], '/register') !== false) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && strpos($_SERVER['REQUEST_URI'], '/registerevent') !== false) {
         if (!is_user_logged_in()) {
             wp_die('Je moet ingelogd zijn om te registreren.');
         }
