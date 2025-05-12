@@ -5,8 +5,12 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
 function sendRegistrationMessage($type, $user_id, $entity_id, $operation = 'create') {
-    $exchange = 'event';
-    $routing_key = 'event.register';
+    if (!in_array($type, ['event', 'session'])) {
+        throw new Exception("❌ Onbekend type '$type'. Moet 'event' of 'session' zijn.");
+    }
+
+    $exchange = $type; // 'event' of 'session'
+    $routing_key = "$type.$operation"; // bv. 'event.register' of 'session.delete'
 
     $connection = new AMQPStreamConnection(
         'rabbitmq',
@@ -29,7 +33,7 @@ function sendRegistrationMessage($type, $user_id, $entity_id, $operation = 'crea
   </event_attendee>
 </attendify>
 XML;
-    } elseif ($type === 'session') {
+    } else { // $type === 'session'
         $xml = <<<XML
 <attendify>
   <info>
@@ -41,8 +45,6 @@ XML;
   </session_attendee>
 </attendify>
 XML;
-    } else {
-        throw new Exception("❌ Onbekend type '$type'. Moet 'event' of 'session' zijn.");
     }
 
     $msg = new AMQPMessage($xml, [

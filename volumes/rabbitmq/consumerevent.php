@@ -163,7 +163,11 @@ class UnifiedConsumer {
             }
         };
 
-        $this->channel->basic_consume($this->queue, '', false, false, false, false, $callback);
+        $queues = ['frontend.event', 'frontend.session'];
+        foreach ($queues as $queue) {
+        $this->channel->basic_consume($queue, '', false, false, false, false, $callback);
+        }
+
         while ($this->channel->is_consuming()) {
             $this->channel->wait();
         }
