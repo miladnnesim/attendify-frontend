@@ -129,9 +129,33 @@ services:
       - attendify_net
       - frontend_net
 
+
+  create-event-payments-table:
+    build:
+      context: .
+      dockerfile: dockerfile-db-migration-payments
+    volumes:
+      - ./volumes/scripts:/usr/src/app
+    environment:
+      - LOCAL_DB_HOST=${LOCAL_DB_HOST}
+      - LOCAL_DB_USER=${LOCAL_DB_USER}
+      - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
+      - LOCAL_DB_NAME=${LOCAL_DB_NAME}
+    depends_on:
+      - db
+    networks:
+      - frontend_net
+
+
+
 networks:
   attendify_net:
     driver: bridge
     name: attendify_net_dev
   frontend_net:
     driver: bridge
+
+
+ 
+
+
