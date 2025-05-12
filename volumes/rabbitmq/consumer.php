@@ -100,10 +100,11 @@ class RabbitMQ_Consumer {
         }
     }
 
-
+//BETALINGEN-TABEL
     private function handlePayment(SimpleXMLElement $xml)
 {
     try {
+
         // Extraire l'opération
         $operation = (string)$xml->info->operation;
 

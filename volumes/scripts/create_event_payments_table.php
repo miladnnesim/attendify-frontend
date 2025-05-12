@@ -1,4 +1,6 @@
 <?php
+
+//BATELINEN-TABEL CREËEREN
 $host = getenv('LOCAL_DB_HOST');
 $db = getenv('LOCAL_DB_NAME');
 $user = getenv('LOCAL_DB_USER');
