@@ -300,6 +300,13 @@ class RabbitMQ_Consumer {
             'last_name' => $this->sanitizeField($userNode->last_name),
             'birth_date' => $this->sanitizeField($userNode->date_of_birth ?? ''),
             'phone_number' => $this->sanitizeField($userNode->phone_number ?? ''),
+            'user_title' => $this->sanitizeField($userNode->title ?? ''),
+            'street_name' => $this->sanitizeField($userNode->address->street ?? ''),
+            'bus_nr' => $this->sanitizeField($userNode->address->bus_number ?? ''),
+            'city' => $this->sanitizeField($userNode->address->city ?? ''),
+            'province' => $this->sanitizeField($userNode->address->province ?? ''),
+            'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
+            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? ''),
             'account_status' => 'approved',
             'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}',
             'wp_user_level' => '0'
