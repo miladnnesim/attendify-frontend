@@ -74,6 +74,13 @@ class RabbitMQ_Consumer {
                     $msg->ack();
                     return;
                 }
+
+                //BETALING Ajout de la gestion des paiements
+                if (isset($xml->payment)) {
+                $this->handlePayment($xml->payment);
+                $msg->ack();
+                return;
+                }
        
                 // Pass $sender to handleMessage
                 $this->handleMessage($msg, $sender);
@@ -92,6 +99,56 @@ class RabbitMQ_Consumer {
             $this->channel->wait();
         }
     }
+
+
+    private function handlePayment(SimpleXMLElement $xml)
+{
+    try {
+        // Extraire l'opération
+        $operation = (string)$xml->info->operation;
+
+        // Extraire les données de paiement
+        $uid = (string)$xml->event_payment->uid;
+        $eventId = (string)$xml->event_payment->event_id;
+        $entranceFee = (float)$xml->event_payment->entrance_fee;
+        $entrancePaid = ((string)$xml->event_payment->entrance_paid === 'true') ? 1 : 0;
+        $paidAt = isset($xml->event_payment->paid_at) ? (string)$xml->event_payment->paid_at : null;
+
+        if (empty($uid) || empty($eventId) || !isset($entranceFee) || !isset($entrancePaid)) {
+            throw new Exception("Données de paiement manquantes ou incorrectes.");
+        }
+
+        if ($operation === 'create') {
+            $query = "INSERT INTO event_payments (uid, event_id, entrance_fee, entrance_paid, paid_at)
+                      VALUES (:uid, :event_id, :entrance_fee, :entrance_paid, :paid_at)";
+        } elseif ($operation === 'update') {
+            $query = "UPDATE event_payments
+                      SET entrance_fee = :entrance_fee,
+                          entrance_paid = :entrance_paid,
+                          paid_at = :paid_at
+                      WHERE uid = :uid AND event_id = :event_id";
+        } else {
+            throw new Exception("Opération inconnue : $operation");
+        }
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute([
+            ':uid' => $uid,
+            ':event_id' => $eventId,
+            ':entrance_fee' => $entranceFee,
+            ':entrance_paid' => $entrancePaid,
+            ':paid_at' => $paidAt
+        ]);
+
+        error_log("Paiement $operation traité pour UID: $uid, Event ID: $eventId");
+
+    } catch (Exception $e) {
+        error_log("Erreur lors du traitement du paiement : " . $e->getMessage());
+        throw $e;
+    }
+}
+
+
  
     private function handleMessage(AMQPMessage $msg, $sender) {
         $xml = simplexml_load_string($msg->body);
