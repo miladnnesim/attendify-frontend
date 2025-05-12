@@ -74,7 +74,11 @@ class RegistrationConsumer {
     }
 
     private function listen() {
-        $this->channel->basic_consume('frontend.event', '', false, false, false, false, [$this, 'handleMessage']);
+        $queues = ['frontend.event', 'frontend.session'];
+        foreach ($queues as $queue) {
+        $this->channel->basic_consume($queue, '', false, false, false, false, $callback);
+        }
+
         while ($this->channel->is_consuming()) {
             $this->channel->wait();
         }
