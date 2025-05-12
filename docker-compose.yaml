@@ -28,6 +28,7 @@ services:
       - ./volumes/wp-content:/var/www/html/wp-content
       - ./volumes/rabbitmq:/var/www/html/rabbitmq
       - ./volumes/vendor:/var/www/html/vendor
+      - ./volumes/scripts:/var/www/html/scripts
     environment:
       - WORDPRESS_DB_HOST=${LOCAL_DB_HOST}
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
