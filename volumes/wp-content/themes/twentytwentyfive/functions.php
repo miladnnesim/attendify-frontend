@@ -665,6 +665,17 @@ add_action('init', function () {
         }
     }
 });
+function um_company_choices_callback() {
+    global $wpdb;
+    $results = $wpdb->get_results("SELECT ondernemingsNummer, naam FROM companies", ARRAY_A);
+
+    $options = array();
+    foreach ($results as $company) {
+        $options[$company['ondernemingsNummer']] = $company['naam'];
+    }
+
+    return $options;
+}
 
 add_shortcode('event_session_list', 'render_event_session_page');
 
