@@ -37,6 +37,8 @@ SERVICES = [
     ('attendify-frontend-db-1', 3306),
     ('attendify-frontend-phpmyadmin-1', 80),
     ('attendify-frontend-consumer-user-1', 80),
+    ('attendify-frontend-consumer-payment-1', 80)
+
 ]
 
 def check_service_status(container_name):
