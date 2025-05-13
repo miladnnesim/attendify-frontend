@@ -362,51 +362,6 @@ function set_activation_key(WP_REST_Request $request) {
     ]);
 }
 
-function render_betalingen_lijst() {
-    if (!is_user_logged_in()) {
-        return '<p>Je moet ingelogd zijn om je betalingen te bekijken.</p>';
-    }
-
-    global $wpdb;
-    $uid = get_user_meta(get_current_user_id(), 'uid', true);
-
-    if (!$uid) {
-        return '<p>Geen UID gevonden voor de huidige gebruiker.</p>';
-    }
-
-    $results = $wpdb->get_results($wpdb->prepare(
-        "SELECT * FROM event_payments WHERE uid = %s ORDER BY paid_at DESC",
-        $uid
-    ));
-
-    if (empty($results)) {
-        return '<p>Er zijn nog geen betalingen geregistreerd.</p>';
-    }
-
-    ob_start();
-    echo '<table style="width:100%; border-collapse: collapse; margin-top: 20px;">';
-    echo '<thead><tr style="background-color: #f0f0f0;">
-            <th style="padding:8px; border: 1px solid #ccc;">Event ID</th>
-            <th style="padding:8px; border: 1px solid #ccc;">Toegang</th>
-            <th style="padding:8px; border: 1px solid #ccc;">Betaald</th>
-            <th style="padding:8px; border: 1px solid #ccc;">Betaald op</th>
-          </tr></thead><tbody>';
-
-    foreach ($results as $row) {
-        echo '<tr>';
-        echo '<td style="padding:8px; border: 1px solid #ccc;">' . esc_html($row->event_id) . '</td>';
-        echo '<td style="padding:8px; border: 1px solid #ccc;">€' . esc_html(number_format($row->entrance_fee, 2)) . '</td>';
-        echo '<td style="padding:8px; border: 1px solid #ccc;">' . ($row->entrance_paid ? '✅' : '❌') . '</td>';
-        echo '<td style="padding:8px; border: 1px solid #ccc;">' . esc_html($row->paid_at ?? '-') . '</td>';
-        echo '</tr>';
-    }
-
-    echo '</tbody></table>';
-    return ob_get_clean();
-}
-add_shortcode('betalingen_lijst', 'render_betalingen_lijst');
-
-
 function render_event_session_page() {
     $html = '';
 
@@ -445,20 +400,28 @@ function render_event_session_page() {
 
             if ($is_registered) {
                 $html .= "<p class='registered'>✅ Je bent al geregistreerd voor dit event.</p>";
+            
+                // Voeg Google Calendar knop toe
+                date_default_timezone_set('Europe/Brussels');
+                $start = date('Ymd\THis\Z', strtotime($event->start_date));
+                $end = date('Ymd\THis\Z', strtotime($event->end_date));
+                $calendar_url = 'https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                    'text'     => $event->title,
+                    'dates'    => $start . '/' . $end,
+                    'details'  => $event->description,
+                    'location' => $event->location
+                ]);
+            
+                $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Voeg toe aan Google Calendar</a>';
+            
                 $html .= '<form method="POST" action="/unregisterevent">';
                 $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
                 $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
                 $html .= '</form>';
-            } else {
-                $html .= '<form method="POST" action="/registerevent">';
-                $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
-                $html .= '<button type="submit" class="button">Registreer voor event</button>';
-                $html .= '</form>';
             }
-        } else {
-            $html .= '<button class="button disabled" disabled>Log in om te registreren</button>';
         }
-
+    
+    
         // Sessies
         $sessions = $wpdb->get_results($wpdb->prepare("SELECT * FROM wp_sessions WHERE event_uid = %s ORDER BY date ASC", $event->uid));
         if ($sessions) {
@@ -641,7 +604,38 @@ add_action('init', function () {
                 wp_redirect(add_query_arg('registered', 'session', wp_get_referer()));
             } elseif ($event_uid) {
                 sendRegistrationMessage('event', $uid, $event_uid); // ✅ goed
-                wp_redirect(add_query_arg('registered', 'event', wp_get_referer()));
+                // Tijdzone correct instellen
+                date_default_timezone_set('Europe/Brussels');
+
+
+
+
+                global $wpdb;
+                $event = $wpdb->get_row($wpdb->prepare("SELECT * FROM wp_events WHERE uid = %s", $event_uid));
+                if (!$event) wp_die('Event niet gevonden.');
+
+                // Start & eindtijd formatteren naar RFC5545 (UTC)
+                $start = date('Ymd\THis\Z', strtotime($event->start_date));
+                $end = date('Ymd\THis\Z', strtotime($event->end_date));
+
+                // Google Calendar link genereren
+                $calendar_url = 'https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                    'text'     => $event->title,
+                    'dates'    => $start . '/' . $end,
+                    'details'  => $event->description,
+                    'location' => $event->location
+                ]);
+
+                // Redirect de gebruiker naar zijn Google Calendar met het event ingevuld
+                echo '<div style="padding: 30px; font-family: sans-serif;">';
+                echo '<h2>✅ Je bent succesvol geregistreerd voor het event.</h2>';
+                echo '<p>Klik hieronder om dit event toe te voegen aan je Google Calendar:</p>';
+                echo '<a href="' . esc_url($calendar_url) . '" target="_blank" style="padding: 12px 20px; background-color: #0073aa; color: white; border-radius: 5px; text-decoration: none;">📅 Voeg toe aan Google Calendar</a>';
+                echo '<br><br><a href="' . esc_url(home_url('/')) . '">← Terug naar de homepage</a>';
+                echo '</div>';
+                exit;
+
+
             }
              else {
                 wp_die('Ongeldige registratiegegevens.');
@@ -654,54 +648,6 @@ add_action('init', function () {
     }
 });
 
-add_shortcode('betalingen_lijst', 'toon_mijn_betalingen');
-
-function toon_mijn_betalingen() {
-    if (!is_user_logged_in()) {
-        return "<p>Log eerst in om je betalingen te bekijken.</p>";
-    }
-
-    global $wpdb;
-
-    $user_id = get_current_user_id();
-    $uid = get_user_meta($user_id, 'uid', true);
-
-    if (!$uid) {
-        return "<p>Je UID kon niet worden gevonden.</p>";
-    }
-
-    $betalingen = $wpdb->get_results($wpdb->prepare("
-        SELECT * FROM event_payments WHERE uid = %s ORDER BY paid_at DESC
-    ", $uid));
-
-    if (empty($betalingen)) {
-        return "<p>Er zijn nog geen betalingen geregistreerd.</p>";
-    }
-
-    $html = "<table style='width:100%; border-collapse: collapse;' border='1'>";
-    $html .= "<thead><tr>
-                <th>Event ID</th>
-                <th>Bedrag</th>
-                <th>Betaald</th>
-                <th>Datum</th>
-              </tr></thead><tbody>";
-
-    foreach ($betalingen as $betaling) {
-        $html .= "<tr>
-                    <td>" . esc_html($betaling->event_id) . "</td>
-                    <td>€" . number_format($betaling->entrance_fee, 2) . "</td>
-                    <td>" . ($betaling->entrance_paid ? "✅ Ja" : "❌ Nee") . "</td>
-                    <td>" . esc_html($betaling->paid_at) . "</td>
-                  </tr>";
-    }
-
-    $html .= "</tbody></table>";
-
-    return $html;
-}
-
-
 add_shortcode('event_session_list', 'render_event_session_page');
-
 
 add_action('init', 'twentytwentyfive_register_block_bindings');
