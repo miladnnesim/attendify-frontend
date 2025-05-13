@@ -390,48 +390,48 @@ function render_event_session_page() {
         $html .= "<p><strong>Locatie:</strong> " . esc_html($event->location) . "</p>";
         $html .= "<p><strong>Datum:</strong> " . esc_html($event->start_date) . " tot " . esc_html($event->end_date) . "</p>";
         $html .= "<p>" . esc_html($event->description) . "</p>";
-
+    
         $is_registered = false;
+    
+        if ($is_logged_in) {
+            $is_registered = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM user_event WHERE user_id = %s AND event_id = %s",
+                $current_user_uid,
+                $event->uid
+            ));
+    
+            if ($is_registered) {
+                $html .= "<p class='registered'>✅ Je bent al geregistreerd voor dit event.</p>";
+    
+                // Google Calendar knop
+                date_default_timezone_set('Europe/Brussels');
+                $start = date('Ymd\THis\Z', strtotime($event->start_date));
+                $end = date('Ymd\THis\Z', strtotime($event->end_date));
+                $calendar_url = 'https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                    'text'     => $event->title,
+                    'dates'    => $start . '/' . $end,
+                    'details'  => $event->description,
+                    'location' => $event->location
+                ]);
+    
+                $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Voeg toe aan Google Calendar</a>';
+    
+                $html .= '<form method="POST" action="/unregisterevent">';
+                $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
+                $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
+                $html .= '</form>';
+            } else {
+                $html .= '<form method="POST" action="/registerevent">';
+                $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
+                $html .= '<button type="submit" class="button">Registreer voor event</button>';
+                $html .= '</form>';
+            }
+        } else {
+            $html .= '<button class="button disabled" disabled>Log in om te registreren</button>';
+        }
 
-if ($is_logged_in) {
-    $is_registered = $wpdb->get_var($wpdb->prepare(
-        "SELECT COUNT(*) FROM user_event WHERE user_id = %s AND event_id = %s",
-        $current_user_uid,
-        $event->uid
-    ));
-}
-
-if ($is_registered) {
-    $html .= "<p class='registered'>✅ Je bent al geregistreerd voor dit event.</p>";
-
-    // Google Calendar link
-    date_default_timezone_set('Europe/Brussels');
-    $start = date('Ymd\THis\Z', strtotime($event->start_date));
-    $end = date('Ymd\THis\Z', strtotime($event->end_date));
-    $calendar_url = 'https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
-        'text'     => $event->title,
-        'dates'    => $start . '/' . $end,
-        'details'  => $event->description,
-        'location' => $event->location
-    ]);
-    $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Voeg toe aan Google Calendar</a>';
-
-    // Annuleer formulier
-    $html .= '<form method="POST" action="/unregisterevent">';
-    $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
-    $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
-    $html .= '</form>';
-} else {
-    if ($is_logged_in) {
-        $html .= '<form method="POST" action="/registerevent">';
-        $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
-        $html .= '<button type="submit" class="button">Registreer voor event</button>';
-        $html .= '</form>';
-    } else {
-        // 🔒 Niet ingelogd → disable de knop
-        $html .= '<button class="button disabled" disabled>Log in om te registreren</button>';
-    }
-}
+    
+        
 
     
     
@@ -468,12 +468,17 @@ if ($is_registered) {
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
                         $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
                         $html .= '</form>';
-                    } else {
+                    } elseif ($is_registered) {
+                        // Alleen registreren voor sessie als je voor event geregistreerd bent
                         $html .= '<form method="POST" action="/registerevent">';
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
                         $html .= '<button type="submit" class="button small">Registreer voor sessie</button>';
                         $html .= '</form>';
+                    } else {
+                        // Niet mogelijk sessie te registreren zonder event
+                        $html .= '<button class="button small disabled" disabled>Registreer eerst voor het event</button>';
                     }
+                    
                 } else {
                     $html .= '<button class="button small disabled" disabled>Log in om te registreren</button>';
                 }
