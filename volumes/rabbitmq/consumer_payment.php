@@ -17,8 +17,6 @@ $connection = new AMQPStreamConnection(
 );
 $channel = $connection->channel();
 
-$channel->queue_declare('betalingen_queue', false, true, false, false);
-
 echo "[*] Wacht op berichten in betalingen_queue. Druk op CTRL+C om te stoppen\n";
 
 $callback = function ($msg) use ($db) {
@@ -65,7 +63,7 @@ $callback = function ($msg) use ($db) {
     }
 };
 
-$channel->basic_consume('betalingen_queue', '', false, true, false, false, $callback);
+$channel->basic_consume('frontend.invoice', '', false, true, false, false, $callback);
 
 while ($channel->is_consuming()) {
     $channel->wait();
