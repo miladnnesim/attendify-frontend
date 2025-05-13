@@ -98,7 +98,7 @@ class Producer {
         $city        = $um_data['city']          ?? get_user_meta($user_id, 'city', true);
         $province    = $um_data['province']      ?? get_user_meta($user_id, 'province', true);
         $country     = $um_data['user_country']  ?? get_user_meta($user_id, 'user_country', true);
-        $vat_number  = $um_data['vat_number']    ?? get_user_meta($user_id, 'vat_number', true);
+        $vat_number  = $um_data['company_vat_number'] ?? get_user_meta($user_id, 'company_vat_number', true);
 
         // XML vullen
         $user_node->addChild('first_name', htmlspecialchars($first_name));

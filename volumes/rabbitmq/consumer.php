@@ -306,7 +306,7 @@ class RabbitMQ_Consumer {
             'city' => $this->sanitizeField($userNode->address->city ?? ''),
             'province' => $this->sanitizeField($userNode->address->province ?? ''),
             'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
-            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? ''),
+            'company_vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? ''),
             'account_status' => 'approved',
             'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}',
             'wp_user_level' => '0'
