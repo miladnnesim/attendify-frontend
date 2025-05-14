@@ -1,7 +1,7 @@
 networks:
   attendify_net:
     internal: true
-    name: attendify_net
+    name: attendify_net_testing
 
   frontend_net:
     driver: bridge
