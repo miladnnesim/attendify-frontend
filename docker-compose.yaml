@@ -1,4 +1,20 @@
 services:
+  consumer-payment:
+    env_file: ./.env
+    image: php:8.1-apache
+    build:
+      context: .
+      dockerfile: dockerfile-consumer
+    volumes:
+      - ./volumes/rabbitmq:/var/www/html/rabbitmq
+      - ./volumes/vendor:/var/www/html/vendor
+    command: php /var/www/html/rabbitmq/consumer_payment.php
+    depends_on:
+      - db
+    restart: always
+    networks:
+      - attendify_net
+      - frontend_net
   wordpress:
     env_file: ./.env
     build:
@@ -12,6 +28,7 @@ services:
       - ./volumes/wp-content:/var/www/html/wp-content
       - ./volumes/rabbitmq:/var/www/html/rabbitmq
       - ./volumes/vendor:/var/www/html/vendor
+      - ./volumes/scripts:/var/www/html/scripts
     environment:
       - WORDPRESS_DB_HOST=${LOCAL_DB_HOST}
       - WORDPRESS_DB_USER=${LOCAL_DB_USER}
@@ -108,6 +125,28 @@ services:
       - attendify_net
       - frontend_net
 
+  consumer-event:
+    env_file: ./.env
+    image: php:8.1-cli
+    build:
+      context: .
+      dockerfile: dockerfile-consumer
+    volumes:
+      - ./volumes/rabbitmq:/var/www/html/rabbitmq
+      - ./volumes/vendor:/var/www/html/vendor
+    environment:
+      - LOCAL_DB_HOST=${LOCAL_DB_HOST}
+      - LOCAL_DB_USER=${LOCAL_DB_USER}
+      - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
+      - LOCAL_DB_NAME=${LOCAL_DB_NAME}
+    command: php /var/www/html/rabbitmq/consumerevent.php
+    depends_on:
+      - db
+    restart: always
+    networks:
+      - attendify_net
+      - frontend_net
+
   heartbeat:
     env_file: ./.env
     image: python:3.9
@@ -129,6 +168,43 @@ services:
       - attendify_net
       - frontend_net
 
+  create-event-payments-table:
+    build:
+      context: .
+      dockerfile: dockerfile-db-migration-payments
+    volumes:
+      - ./volumes/scripts:/usr/src/app
+    environment:
+      - LOCAL_DB_HOST=${LOCAL_DB_HOST}
+      - LOCAL_DB_USER=${LOCAL_DB_USER}
+      - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
+      - LOCAL_DB_NAME=${LOCAL_DB_NAME}
+    depends_on:
+      - db
+    networks:
+      - frontend_net
+
+  consumer-company:
+    env_file: ./.env
+    image: php:8.1-cli
+    build:
+      context: .
+      dockerfile: dockerfile-consumer
+    volumes:
+      - ./volumes/rabbitmq:/var/www/html/rabbitmq
+      - ./volumes/vendor:/var/www/html/vendor
+    environment:
+      - LOCAL_DB_HOST=${LOCAL_DB_HOST}
+      - LOCAL_DB_USER=${LOCAL_DB_USER}
+      - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
+      - LOCAL_DB_NAME=${LOCAL_DB_NAME}
+    command: php /var/www/html/rabbitmq/consumercompany.php
+    depends_on:
+      - db
+    restart: always
+    networks:
+      - attendify_net
+      - frontend_net
 networks:
   attendify_net:
     driver: bridge

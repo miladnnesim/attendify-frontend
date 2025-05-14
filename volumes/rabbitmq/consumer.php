@@ -74,6 +74,13 @@ class RabbitMQ_Consumer {
                     $msg->ack();
                     return;
                 }
+
+                //BETALING Ajout de la gestion des paiements
+                if (isset($xml->payment)) {
+                $this->handlePayment($xml->payment);
+                $msg->ack();
+                return;
+                }
        
                 // Pass $sender to handleMessage
                 $this->handleMessage($msg, $sender);
@@ -92,6 +99,57 @@ class RabbitMQ_Consumer {
             $this->channel->wait();
         }
     }
+
+//BETALINGEN-TABEL
+    private function handlePayment(SimpleXMLElement $xml)
+{
+    try {
+
+        // Extraire l'opération
+        $operation = (string)$xml->info->operation;
+
+        // Extraire les données de paiement
+        $uid = (string)$xml->event_payment->uid;
+        $eventId = (string)$xml->event_payment->event_id;
+        $entranceFee = (float)$xml->event_payment->entrance_fee;
+        $entrancePaid = ((string)$xml->event_payment->entrance_paid === 'true') ? 1 : 0;
+        $paidAt = isset($xml->event_payment->paid_at) ? (string)$xml->event_payment->paid_at : null;
+
+        if (empty($uid) || empty($eventId) || !isset($entranceFee) || !isset($entrancePaid)) {
+            throw new Exception("Données de paiement manquantes ou incorrectes.");
+        }
+
+        if ($operation === 'create') {
+            $query = "INSERT INTO event_payments (uid, event_id, entrance_fee, entrance_paid, paid_at)
+                      VALUES (:uid, :event_id, :entrance_fee, :entrance_paid, :paid_at)";
+        } elseif ($operation === 'update') {
+            $query = "UPDATE event_payments
+                      SET entrance_fee = :entrance_fee,
+                          entrance_paid = :entrance_paid,
+                          paid_at = :paid_at
+                      WHERE uid = :uid AND event_id = :event_id";
+        } else {
+            throw new Exception("Opération inconnue : $operation");
+        }
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute([
+            ':uid' => $uid,
+            ':event_id' => $eventId,
+            ':entrance_fee' => $entranceFee,
+            ':entrance_paid' => $entrancePaid,
+            ':paid_at' => $paidAt
+        ]);
+
+        error_log("Paiement $operation traité pour UID: $uid, Event ID: $eventId");
+
+    } catch (Exception $e) {
+        error_log("Erreur lors du traitement du paiement : " . $e->getMessage());
+        throw $e;
+    }
+}
+
+
  
     private function handleMessage(AMQPMessage $msg, $sender) {
         $xml = simplexml_load_string($msg->body);
@@ -242,8 +300,16 @@ class RabbitMQ_Consumer {
             'last_name' => $this->sanitizeField($userNode->last_name),
             'birth_date' => $this->sanitizeField($userNode->date_of_birth ?? ''),
             'phone_number' => $this->sanitizeField($userNode->phone_number ?? ''),
+            'user_title' => $this->sanitizeField($userNode->title ?? ''),
+            'street_name' => $this->sanitizeField($userNode->address->street ?? ''),
+            'bus_nr' => $this->sanitizeField($userNode->address->bus_number ?? ''),
+            'city' => $this->sanitizeField($userNode->address->city ?? ''),
+            'province' => $this->sanitizeField($userNode->address->province ?? ''),
+            'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
+            'company_vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? ''),
             'account_status' => 'approved',
-            'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}'
+            'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}',
+            'wp_user_level' => '0'
         ];
     
         $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
@@ -299,8 +365,8 @@ class RabbitMQ_Consumer {
         $checkQuery = "SELECT u.ID 
         FROM {$this->table_prefix}_users u
         INNER JOIN {$this->table_prefix}_usermeta m ON u.ID = m.user_id
-        WHERE m.meta_key = 'unified_user_id' AND m.meta_value = :uid";
-
+        WHERE m.meta_key = 'uid' AND m.meta_value = :uid";
+    
         $checkStmt = $this->db->prepare($checkQuery);
         $checkStmt->execute([':uid' => $uid]);
         $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -317,7 +383,6 @@ class RabbitMQ_Consumer {
         $params = [
             ':user_email' => $email,
             ':user_login' => $email,
-            ':user_email_where' => $email
         ];
     
         if (isset($userNode->password) && !empty($userNode->password)) {
@@ -343,33 +408,37 @@ class RabbitMQ_Consumer {
             'city' => $this->sanitizeField($userNode->address->city ?? ''),
             'province' => $this->sanitizeField($userNode->address->province ?? ''),
             'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
-            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? '')
+            'vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? ''),
+            'full_name' => trim($this->sanitizeField($userNode->first_name) . ' ' . $this->sanitizeField($userNode->last_name))
+
         ];
     
-        $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
-                      VALUES (:user_id, :meta_key, :meta_value)
-                      ON DUPLICATE KEY UPDATE meta_value = :meta_value";
-        $metaStmt = $this->db->prepare($metaQuery);
-    
         foreach ($updateFields as $key => $value) {
-            if ($value !== '' && $value !== null) {
-                $metaStmt->execute([
-                    ':user_id' => $userId,
-                    ':meta_key' => $key,
-                    ':meta_value' => $value
-                ]);
+            if ($value === '' || $value === null) continue;
+    
+            $checkMeta = $this->db->prepare("SELECT umeta_id FROM {$this->table_prefix}_usermeta WHERE user_id = :user_id AND meta_key = :meta_key");
+            $checkMeta->execute([':user_id' => $userId, ':meta_key' => $key]);
+            $exists = $checkMeta->fetchColumn();
+    
+            if ($exists) {
+                $updateMeta = $this->db->prepare("UPDATE {$this->table_prefix}_usermeta SET meta_value = :meta_value WHERE user_id = :user_id AND meta_key = :meta_key");
+                $updateMeta->execute([':meta_value' => $value, ':user_id' => $userId, ':meta_key' => $key]);
+            } else {
+                $insertMeta = $this->db->prepare("INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value) VALUES (:user_id, :meta_key, :meta_value)");
+                $insertMeta->execute([':user_id' => $userId, ':meta_key' => $key, ':meta_value' => $value]);
             }
         }
     
         error_log("Updated user with UID: $uid (ID: $userId)");
     }
     
+    
  
     private function deleteUser(string $uid) {
         $checkQuery = "SELECT u.ID 
         FROM {$this->table_prefix}_users u
         INNER JOIN {$this->table_prefix}_usermeta m ON u.ID = m.user_id
-        WHERE m.meta_key = 'unified_user_id' AND m.meta_value = :uid";
+        WHERE m.meta_key = 'uid' AND m.meta_value = :uid";
 
         $checkStmt = $this->db->prepare($checkQuery);
         $checkStmt->execute([':uid' => $uid]);

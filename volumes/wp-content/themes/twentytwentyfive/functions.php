@@ -9,6 +9,7 @@
  * @since Twenty Twenty-Five 1.0
  */
 require_once ABSPATH . '/rabbitmq/producer.php';
+require_once ABSPATH . '/rabbitmq/produceruserlinkevent.php';
 
 
 // Adds theme support for post formats.
@@ -273,6 +274,7 @@ function save_custom_fields_in_account($changes, $user_id) {
 }
 
 function send_user_data_to_rabbitmq_create($user_id, $args) {
+    sleep(2); // wacht 2 seconden
     try {
         $producer = new Producer();
         $producer->sendUserData($user_id, 'create');
@@ -360,6 +362,321 @@ function set_activation_key(WP_REST_Request $request) {
     ]);
 }
 
+function render_event_session_page() {
+    $html = '';
 
+    if (isset($_GET['registered'])) {
+        $html .= '<div class="notice notice-success"><p>Je bent succesvol geregistreerd voor een ' . esc_html($_GET['registered']) . '.</p></div>';
+    } elseif (isset($_GET['unregistered'])) {
+        $html .= '<div class="notice notice-info"><p>Je registratie voor de ' . esc_html($_GET['unregistered']) . ' is geannuleerd.</p></div>';
+    }
+
+    $is_logged_in = is_user_logged_in();
+    $current_user_id = $is_logged_in ? get_current_user_id() : null;
+    $current_user_uid = $is_logged_in ? get_user_meta($current_user_id, 'uid', true) : null;
+
+    global $wpdb;
+    $events = $wpdb->get_results("SELECT * FROM wp_events ORDER BY start_date ASC");
+
+    if (empty($events)) {
+        return "<p>Geen evenementen gevonden.</p>";
+    }
+
+    $html .= '<div class="event-list">';
+    foreach ($events as $index => $event) {
+        $html .= "<div class='event-block'>";
+        $html .= "<h2>" . esc_html($event->title) . "</h2>";
+        $html .= "<p><strong>Toegang:</strong> €" . esc_html(number_format($event->entrance_fee, 2)) . "</p>";
+        $html .= "<p><strong>Locatie:</strong> " . esc_html($event->location) . "</p>";
+        $html .= "<p><strong>Datum:</strong> " . esc_html($event->start_date) . " tot " . esc_html($event->end_date) . "</p>";
+        $html .= "<p>" . esc_html($event->description) . "</p>";
+    
+        $is_registered = false;
+    
+        if ($is_logged_in) {
+            $is_registered = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM user_event WHERE user_id = %s AND event_id = %s",
+                $current_user_uid,
+                $event->uid
+            ));
+    
+            if ($is_registered) {
+                $html .= "<p class='registered'>✅ Je bent al geregistreerd voor dit event.</p>";
+    
+                // Google Calendar knop
+                date_default_timezone_set('Europe/Brussels');
+                $start = date('Ymd\THis\Z', strtotime($event->start_date));
+                $end = date('Ymd\THis\Z', strtotime($event->end_date));
+                $calendar_url = 'https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                    'text'     => $event->title,
+                    'dates'    => $start . '/' . $end,
+                    'details'  => $event->description,
+                    'location' => $event->location
+                ]);
+    
+                $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Voeg toe aan Google Calendar</a>';
+    
+                $html .= '<form method="POST" action="/unregisterevent">';
+                $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
+                $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
+                $html .= '</form>';
+            } else {
+                $html .= '<form method="POST" action="/registerevent">';
+                $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
+                $html .= '<button type="submit" class="button">Registreer voor event</button>';
+                $html .= '</form>';
+            }
+        } else {
+            $html .= '<button class="button disabled" disabled>Log in om te registreren</button>';
+        }
+
+    
+        
+
+    
+    
+        // Sessies
+        $sessions = $wpdb->get_results($wpdb->prepare("SELECT * FROM wp_sessions WHERE event_uid = %s ORDER BY date ASC", $event->uid));
+        if ($sessions) {
+            $html .= "<button class='toggle-button' onclick='toggleSessions(\"sessions_$index\")'>Toon/Verberg Sessies</button>";
+            $html .= "<div class='session-list' id='sessions_$index' style='display:none;'><ul>";
+
+            foreach ($sessions as $session) {
+                $count = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM user_session WHERE session_id = %s",
+                    $session->uid
+                ));
+
+                $html .= "<li>";
+                $html .= "<strong>" . esc_html($session->title) . "</strong><br>";
+                $html .= "<em>" . esc_html($session->date) . " (" . esc_html($session->start_time) . " - " . esc_html($session->end_time) . ")</em><br>";
+                $html .= "<p>" . esc_html($session->description) . "</p>";
+                $html .= "<p><strong>Locatie:</strong> " . esc_html($session->location) . "</p>";
+                $html .= "<p><strong>Spreker:</strong> " . esc_html($session->speaker_name) . "<br><em>" . esc_html($session->speaker_bio) . "</em></p>";
+                $html .= "<p><strong>Aantal deelnemers:</strong> " . esc_html($count) . " / " . esc_html($session->max_attendees) . "</p>";
+
+                if ($is_logged_in) {
+                    $is_registered_session = $wpdb->get_var($wpdb->prepare(
+                        "SELECT COUNT(*) FROM user_session WHERE user_id = %s AND session_id = %s",
+                        $current_user_uid,
+                        $session->uid
+                    ));
+
+                    if ($is_registered_session) {
+                        $html .= "<p class='registered'>✅ Je bent al geregistreerd voor deze sessie.</p>";
+                        $html .= '<form method="POST" action="/unregisterevent">';
+                        $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
+                        $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
+                        $html .= '</form>';
+                    } elseif ($is_registered) {
+                        // Alleen registreren voor sessie als je voor event geregistreerd bent
+                        $html .= '<form method="POST" action="/registerevent">';
+                        $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
+                        $html .= '<button type="submit" class="button small">Registreer voor sessie</button>';
+                        $html .= '</form>';
+                    } else {
+                        // Niet mogelijk sessie te registreren zonder event
+                        $html .= '<button class="button small disabled" disabled>Registreer eerst voor het event</button>';
+                    }
+                    
+                } else {
+                    $html .= '<button class="button small disabled" disabled>Log in om te registreren</button>';
+                }
+
+                $html .= "</li>";
+            }
+
+            $html .= "</ul></div>";
+        }
+
+        $html .= "</div><hr>";
+    }
+
+    $html .= "</div>";
+    $html .= <<<JS
+<script>
+function toggleSessions(id) {
+    const element = document.getElementById(id);
+    element.style.display = element.style.display === "none" ? "block" : "none";
+}
+</script>
+JS;
+
+    return $html;
+}
+
+
+function custom_button_styles() {
+    echo '<style>
+    .button {
+  display: inline-block;
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  background-color: #0073aa;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.button:hover {
+  background-color: #005a8c;
+}
+
+.button.small {
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.button.disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+  .toggle-button {
+  display: inline-block;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding: 8px 14px;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.toggle-button:hover {
+  background-color: #e0e0e0;
+}
+.button.red {
+  background-color: #c0392b;
+}
+.button.red:hover {
+  background-color: #922b21;
+}
+
+    </style>';
+}
+add_action('wp_head', 'custom_button_styles');
+
+
+function get_user_uid($user_id) {
+    return get_user_meta($user_id, 'uid', true);
+}
+
+add_action('init', function () {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && strpos($_SERVER['REQUEST_URI'], '/unregisterevent') !== false) {
+        if (!is_user_logged_in()) {
+            wp_die('Je moet ingelogd zijn om je registratie te annuleren.');
+        }
+
+        $wordpress_user_id = get_current_user_id();
+        $uid = get_user_meta($wordpress_user_id, 'uid', true);
+
+        if (empty($uid)) {
+            wp_die('UID niet gevonden voor de huidige gebruiker.');
+        }
+
+        $event_uid = $_POST['event_uid'] ?? null;
+        $session_uid = $_POST['session_uid'] ?? null;
+
+        try {
+            if ($session_uid) {
+                sendRegistrationMessage('session', $uid, $session_uid, 'delete');
+                wp_redirect(add_query_arg('unregistered', 'session', wp_get_referer()));
+            } elseif ($event_uid) {
+                sendRegistrationMessage('event', $uid, $event_uid, 'delete');
+                wp_redirect(add_query_arg('unregistered', 'event', wp_get_referer()));
+            } else {
+                wp_die('Ongeldige annuleringsgegevens.');
+            }
+            exit;
+        } catch (Exception $e) {
+            error_log("Annulering fout: " . $e->getMessage());
+            wp_die('Annulering mislukt.');
+        }
+    }
+});
+
+add_action('init', function () {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && strpos($_SERVER['REQUEST_URI'], '/registerevent') !== false) {
+        if (!is_user_logged_in()) {
+            wp_die('Je moet ingelogd zijn om te registreren.');
+        }
+
+        $wordpress_user_id = get_current_user_id();
+        $uid = get_user_uid($wordpress_user_id);
+
+        if (empty($uid)) {
+            wp_die('UID niet gevonden voor de huidige gebruiker.');
+        }
+
+        $event_uid = $_POST['event_uid'] ?? null;
+        $session_uid = $_POST['session_uid'] ?? null;
+
+        try {
+            if ($session_uid) {
+                sendRegistrationMessage('session', $uid, $session_uid); // ✅ goed
+                wp_redirect(add_query_arg('registered', 'session', wp_get_referer()));
+            } elseif ($event_uid) {
+                sendRegistrationMessage('event', $uid, $event_uid); // ✅ goed
+                // Tijdzone correct instellen
+                date_default_timezone_set('Europe/Brussels');
+
+
+
+
+                global $wpdb;
+                $event = $wpdb->get_row($wpdb->prepare("SELECT * FROM wp_events WHERE uid = %s", $event_uid));
+                if (!$event) wp_die('Event niet gevonden.');
+
+                // Start & eindtijd formatteren naar RFC5545 (UTC)
+                $start = date('Ymd\THis\Z', strtotime($event->start_date));
+                $end = date('Ymd\THis\Z', strtotime($event->end_date));
+
+                // Google Calendar link genereren
+                $calendar_url = 'https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                    'text'     => $event->title,
+                    'dates'    => $start . '/' . $end,
+                    'details'  => $event->description,
+                    'location' => $event->location
+                ]);
+
+                // Redirect de gebruiker naar zijn Google Calendar met het event ingevuld
+                echo '<div style="padding: 30px; font-family: sans-serif;">';
+                echo '<h2>✅ Je bent succesvol geregistreerd voor het event.</h2>';
+                echo '<p>Klik hieronder om dit event toe te voegen aan je Google Calendar:</p>';
+                echo '<a href="' . esc_url($calendar_url) . '" target="_blank" style="padding: 12px 20px; background-color: #0073aa; color: white; border-radius: 5px; text-decoration: none;">📅 Voeg toe aan Google Calendar</a>';
+                echo '<br><br><a href="' . esc_url(home_url('/')) . '">← Terug naar de homepage</a>';
+                echo '</div>';
+                exit;
+
+
+            }
+             else {
+                wp_die('Ongeldige registratiegegevens.');
+            }
+            exit;
+        } catch (Exception $e) {
+            error_log("Producer fout: " . $e->getMessage());
+            wp_die('Registratie mislukt.');
+        }
+    }
+});
+function um_company_choices_callback() {
+    global $wpdb;
+    $results = $wpdb->get_results("SELECT ondernemingsNummer, naam FROM companies", ARRAY_A);
+
+    $options = array();
+    foreach ($results as $company) {
+        $options[$company['ondernemingsNummer']] = $company['naam'];
+    }
+
+    return $options;
+}
+
+add_shortcode('event_session_list', 'render_event_session_page');
 
 add_action('init', 'twentytwentyfive_register_block_bindings');
