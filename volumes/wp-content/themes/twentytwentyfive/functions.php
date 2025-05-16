@@ -223,8 +223,8 @@ function um_account_content_hook_extra_info($output, $tab_id) {
     // Start de output
     ob_start();
     ?>
-    <div class="um-form">
-        <?php
+<div class="um-form">
+    <?php
         if (!$fields_displayed) {
             echo '<p>Geen bewerkbare velden gevonden in het registratieformulier.</p>';
         } else {
@@ -234,8 +234,8 @@ function um_account_content_hook_extra_info($output, $tab_id) {
             }
         }
         ?>
-    </div>
-    <?php
+</div>
+<?php
     $output .= ob_get_clean();
     return $output;
 }
@@ -667,11 +667,11 @@ add_action('init', function () {
 });
 function um_company_choices_callback() {
     global $wpdb;
-    $results = $wpdb->get_results("SELECT ondernemingsNummer, naam FROM companies", ARRAY_A);
+    $results = $wpdb->get_results("SELECT uid, name FROM companies", ARRAY_A);
 
     $options = array();
     foreach ($results as $company) {
-        $options[$company['ondernemingsNummer']] = $company['naam'];
+        $options[$company['uid']] = $company['name'];
     }
 
     return $options;
