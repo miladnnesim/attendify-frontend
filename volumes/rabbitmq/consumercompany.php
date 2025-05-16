@@ -28,19 +28,20 @@ class CompanyConsumer {
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS companies (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                ondernemingsnummer VARCHAR(20) UNIQUE,
-                naam VARCHAR(255),
-                btwnummer VARCHAR(20),
-                straat VARCHAR(255),
-                nummer VARCHAR(10),
+                uid VARCHAR(30) UNIQUE,
+                companyNumber VARCHAR(20),
+                name VARCHAR(255),
+                VATNumber VARCHAR(20),
+                street VARCHAR(255),
+                number VARCHAR(10),
                 postcode VARCHAR(10),
-                gemeente VARCHAR(255),
-                facturatie_straat VARCHAR(255),
-                facturatie_nummer VARCHAR(10),
-                facturatie_postcode VARCHAR(10),
-                facturatie_gemeente VARCHAR(255),
+                city VARCHAR(255),
+                billing_street VARCHAR(255),
+                billing_number VARCHAR(10),
+                billing_postcode VARCHAR(10),
+                billing_city VARCHAR(255),
                 email VARCHAR(255),
-                telefoon VARCHAR(50),
+                phone VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -74,10 +75,10 @@ class CompanyConsumer {
             if (!$xml) throw new Exception("❌ Ongeldig XML-formaat");
 
             $operation = (string) $xml->info->operation;
-            $bedrijf = $xml->bedrijf;
-            if (!$bedrijf) throw new Exception("❌ Geen <bedrijf> gevonden in XML");
+            $company = $xml->companies->company;
+            if (!$company) throw new Exception("❌ Geen <company> gevonden in XML");
 
-            $this->handleCompany($bedrijf, $operation);
+            $this->handleCompany($company, $operation);
 
             $msg->ack();
         } catch (Exception $e) {
@@ -86,61 +87,64 @@ class CompanyConsumer {
         }
     }
 
-    private function handleCompany(SimpleXMLElement $bedrijf, $operation) {
-        $ondernemingsnummer = (string) $bedrijf->ondernemingsNummer;
-        if (!$ondernemingsnummer) throw new Exception("❌ ondernemingsNummer ontbreekt");
+    private function handleCompany(SimpleXMLElement $company, $operation) {
+        $uid = (string) $company->uid;
+        if (!$uid) throw new Exception("❌ uid ontbreekt");
 
         if ($operation === 'delete') {
-            $stmt = $this->db->prepare("DELETE FROM companies WHERE ondernemingsnummer = :nr");
-            $stmt->execute([':nr' => $ondernemingsnummer]);
-            error_log("❌ Bedrijf $ondernemingsnummer verwijderd");
+            $stmt = $this->db->prepare("DELETE FROM companies WHERE uid = :uid");
+            $stmt->execute([':uid' => $uid]);
+            error_log("❌ Bedrijf $uid verwijderd");
             return;
         }
 
         // insert or update
         $stmt = $this->db->prepare("
             INSERT INTO companies (
-                ondernemingsnummer, naam, btwnummer,
-                straat, nummer, postcode, gemeente,
-                facturatie_straat, facturatie_nummer, facturatie_postcode, facturatie_gemeente,
-                email, telefoon
+                uid, companyNumber, name, VATNumber,
+                street, number, postcode, city,
+                billing_street, billing_number, billing_postcode, billing_city,
+                email, phone
             ) VALUES (
-                :ondernemingsnummer, :naam, :btw,
-                :straat, :nummer, :postcode, :gemeente,
-                :f_straat, :f_nummer, :f_postcode, :f_gemeente,
-                :email, :telefoon
+                :uid, :companyNumber, :name, :VATNumber,
+                :street, :number, :postcode, :city,
+                :billing_street, :billing_number, :billing_postcode, :billing_city,
+                :email, :phone
             )
             ON DUPLICATE KEY UPDATE
-                naam = VALUES(naam),
-                btwnummer = VALUES(btwnummer),
-                straat = VALUES(straat),
-                nummer = VALUES(nummer),
+                companyNumber = VALUES(companyNumber),
+                name = VALUES(name),
+                VATNumber = VALUES(VATNumber),
+                street = VALUES(street),
+                number = VALUES(number),
                 postcode = VALUES(postcode),
-                gemeente = VALUES(gemeente),
-                facturatie_straat = VALUES(facturatie_straat),
-                facturatie_nummer = VALUES(facturatie_nummer),
-                facturatie_postcode = VALUES(facturatie_postcode),
-                facturatie_gemeente = VALUES(facturatie_gemeente),
+                city = VALUES(city),
+                billing_street = VALUES(billing_street),
+                billing_number = VALUES(billing_number),
+                billing_postcode = VALUES(billing_postcode),
+                billing_city = VALUES(billing_city),
                 email = VALUES(email),
-                telefoon = VALUES(telefoon)
+                phone = VALUES(phone)
         ");
+
         $stmt->execute([
-            ':ondernemingsnummer' => $ondernemingsnummer,
-            ':naam' => (string) $bedrijf->naam,
-            ':btw' => (string) $bedrijf->btwNummer,
-            ':straat' => (string) $bedrijf->adres->straat,
-            ':nummer' => (string) $bedrijf->adres->nummer,
-            ':postcode' => (string) $bedrijf->adres->postcode,
-            ':gemeente' => (string) $bedrijf->adres->gemeente,
-            ':f_straat' => (string) $bedrijf->facturatieAdres->straat,
-            ':f_nummer' => (string) $bedrijf->facturatieAdres->nummer,
-            ':f_postcode' => (string) $bedrijf->facturatieAdres->postcode,
-            ':f_gemeente' => (string) $bedrijf->facturatieAdres->gemeente,
-            ':email' => (string) $bedrijf->email,
-            ':telefoon' => (string) $bedrijf->telefoon
+            ':uid' => $uid,
+            ':companyNumber' => (string) $company->companyNumber,
+            ':name' => (string) $company->name,
+            ':VATNumber' => (string) $company->VATNumber,
+            ':street' => (string) $company->address->street,
+            ':number' => (string) $company->address->number,
+            ':postcode' => (string) $company->address->postcode,
+            ':city' => (string) $company->address->city,
+            ':billing_street' => (string) $company->billingAddress->street,
+            ':billing_number' => (string) $company->billingAddress->number,
+            ':billing_postcode' => (string) $company->billingAddress->postcode,
+            ':billing_city' => (string) $company->billingAddress->city,
+            ':email' => (string) $company->email,
+            ':phone' => (string) $company->phone
         ]);
 
-        error_log("✅ Bedrijf $ondernemingsnummer " . ($operation === 'create' ? 'aangemaakt' : 'bijgewerkt'));
+        error_log("✅ Bedrijf $uid " . ($operation === 'register' ? 'aangemaakt' : 'bijgewerkt'));
     }
 }
 
@@ -149,4 +153,4 @@ try {
 } catch (Exception $e) {
     error_log("❌ CompanyConsumer kon niet starten: " . $e->getMessage());
     exit(1);
-}
+} ?>
