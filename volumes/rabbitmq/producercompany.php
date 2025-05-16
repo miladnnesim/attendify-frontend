@@ -21,7 +21,6 @@ class CompanyProducer {
 
         $this->channel = $this->connection->channel();
 
-        // Declare the exchange (if it does not already exist)
         $this->channel->exchange_declare(
             $this->exchange,
             'direct',
@@ -31,12 +30,6 @@ class CompanyProducer {
         );
     }
 
-    /**
-     * Sends company data to RabbitMQ
-     *
-     * @param array $data The company data to be sent
-     * @param string $operation The type of operation (e.g., register, update, delete)
-     */
     public function sendCompanyData(array $data, string $operation = 'register') {
         $xml = $this->buildXML($data, $operation);
         $msg = new AMQPMessage($xml, [
@@ -51,48 +44,46 @@ class CompanyProducer {
         error_log("📤 [Producer] Sent message to RabbitMQ with routing key: $routingKey");
     }
 
-    /**
-     * Builds an XML message that matches what the Consumer expects
-     *
-     * @param array $data The company data
-     * @param string $operation The operation type
-     * @return string XML message
-     */
     private function buildXML(array $data, string $operation): string {
-        $xml = new SimpleXMLElement('<root/>');
+        $xml = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?>
+<attendify xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="company_be.xsd" />');
 
-        $bedrijf = $xml->addChild('bedrijf');
-        $bedrijf->addChild('ondernemingsNummer', htmlspecialchars($data['ondernemingsnummer']));
-        $bedrijf->addChild('naam', htmlspecialchars($data['naam']));
-        $bedrijf->addChild('btwNummer', htmlspecialchars($data['btwnummer']));
+$info = $xml->addChild('info');
+$info->addChild('sender', 'frontend');
+$info->addChild('operation', $operation);
 
-        $adres = $bedrijf->addChild('adres');
-        $adres->addChild('straat', htmlspecialchars($data['straat']));
-        $adres->addChild('nummer', htmlspecialchars($data['nummer']));
-        $adres->addChild('postcode', htmlspecialchars($data['postcode']));
-        $adres->addChild('gemeente', htmlspecialchars($data['gemeente']));
+$companies = $xml->addChild('companies');
+$company = $companies->addChild('company');
 
-        $fAdres = $bedrijf->addChild('facturatieAdres');
-        $fAdres->addChild('straat', htmlspecialchars($data['facturatie_straat']));
-        $fAdres->addChild('nummer', htmlspecialchars($data['facturatie_nummer']));
-        $fAdres->addChild('postcode', htmlspecialchars($data['facturatie_postcode']));
-        $fAdres->addChild('gemeente', htmlspecialchars($data['facturatie_gemeente']));
+$company->addChild('uid', htmlspecialchars($data['uid']));
+$company->addChild('companyNumber', htmlspecialchars($data['companyNumber']));
+$company->addChild('name', htmlspecialchars($data['name']));
+$company->addChild('VATNumber', htmlspecialchars($data['VATNumber']));
 
-        $bedrijf->addChild('email', htmlspecialchars($data['email']));
-        $bedrijf->addChild('telefoon', htmlspecialchars($data['telefoon']));
+$address = $company->addChild('address');
+$address->addChild('street', htmlspecialchars($data['street']));
+$address->addChild('number', htmlspecialchars($data['number']));
+$address->addChild('postcode', htmlspecialchars($data['postcode']));
+$address->addChild('city', htmlspecialchars($data['city']));
 
-        $info = $xml->addChild('info');
-        $info->addChild('operation', $operation);
+$billingAddress = $company->addChild('billingAddress');
+$billingAddress->addChild('street', htmlspecialchars($data['billing_street']));
+$billingAddress->addChild('number', htmlspecialchars($data['billing_number']));
+$billingAddress->addChild('postcode', htmlspecialchars($data['billing_postcode']));
+$billingAddress->addChild('city', htmlspecialchars($data['billing_city']));
 
-        return $xml->asXML();
-    }
+$company->addChild('email', htmlspecialchars($data['email']));
+$company->addChild('phone', htmlspecialchars($data['phone']));
 
-    public function __destruct() {
-        if ($this->channel) {
-            $this->channel->close();
-        }
-        if ($this->connection) {
-            $this->connection->close();
-        }
-    }
+return $xml->asXML();
+}
+
+public function __destruct() {
+if ($this->channel) {
+$this->channel->close();
+}
+if ($this->connection) {
+$this->connection->close();
+}
+}
 }
