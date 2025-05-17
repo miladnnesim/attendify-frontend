@@ -61,6 +61,8 @@ function company_register_form_shortcode() {
     <input type="submit" value="Register">
 </form>
 <?php
+    $success = false;
+
     if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $company_data = [
             'uid' => sanitize_text_field($_POST['uid'] ?? ''),
@@ -82,11 +84,15 @@ function company_register_form_shortcode() {
         try {
             $producer = new CompanyProducer();
             $producer->sendCompanyData($company_data, 'register');
-            echo "<p style='color:green;'>✅ The company was successfully submitted for processing.</p>";
+            $success = true;
         } catch (Exception $e) {
             echo "<p style='color:red;'>❌ Something went wrong while sending the data. Please try again later.</p>";
             error_log("RabbitMQ Error: " . $e->getMessage());
         }
+    }
+
+    if ($success) {
+        echo "<p style='color:green;'>✅ The company was successfully submitted for processing.</p>";
     }
 
     return ob_get_clean();
