@@ -291,7 +291,8 @@ class RabbitMQ_Consumer {
     
         $user_id = $this->db->lastInsertId();
         error_log("Inserted user with auto-increment ID: $user_id");
-    
+        $isAdmin = strtolower((string)($userNode->is_admin ?? 'false')) === 'true';
+
         // Insert user meta fields
         $metaFields = [
             'uid' => $uid, // <-- Extra: hier UID opslaan in usermeta
@@ -308,8 +309,9 @@ class RabbitMQ_Consumer {
             'user_country' => $this->sanitizeField($userNode->address->country ?? ''),
             'company_vat_number' => $this->sanitizeField($userNode->company->VAT_number ?? ''),
             'account_status' => 'approved',
-            'wp_capabilities' => 'a:1:{s:10:"subscriber";b:1;}',
-            'wp_user_level' => '0'
+            'wp_capabilities' => $isAdmin ? 'a:1:{s:13:"administrator";b:1;}' : 'a:1:{s:10:"subscriber";b:1;}',
+            'wp_user_level'   => $isAdmin ? '10' : '0',
+            'is_admin'        => $isAdmin ? '1' : '0'
         ];
     
         $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
@@ -326,7 +328,7 @@ class RabbitMQ_Consumer {
             }
         }
     
-        error_log("Created user with ID: $user_id, stored UID $uid, set role to 'subscriber' and account_status to approved");
+        error_log("Created user with ID: $user_id, stored UID $uid, role: " . ($isAdmin ? 'admin' : 'subscriber'));
     }
     
    
