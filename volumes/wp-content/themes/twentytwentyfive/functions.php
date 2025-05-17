@@ -545,70 +545,70 @@ function render_event_session_page() {
 
     $html .= "</div>";
     $html .= <<<JS
-<script>
-function toggleSessions(id) {
-    const element = document.getElementById(id);
-    element.style.display = element.style.display === "none" ? "block" : "none";
-}
-</script>
-JS;
+    <script>
+    function toggleSessions(id) {
+        const element = document.getElementById(id);
+        element.style.display = element.style.display === "none" ? "block" : "none";
+    }
+    </script>
+    JS;
 
     return $html;
 }
 
 
 function custom_button_styles() {
-    echo '<style>
-    .button {
-  display: inline-block;
-  padding: 10px 18px;
-  font-size: 15px;
-  font-weight: 600;
-  text-align: center;
-  text-decoration: none;
-  background-color: #0073aa;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  transition: background-color 0.3s ease;
-  cursor: pointer;
-  margin-top: 8px;
-}
+            echo '<style>
+            .button {
+        display: inline-block;
+        padding: 10px 18px;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+        background-color: #0073aa;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        transition: background-color 0.3s ease;
+        cursor: pointer;
+        margin-top: 8px;
+        }
 
-.button:hover {
-  background-color: #005a8c;
-}
+        .button:hover {
+        background-color: #005a8c;
+        }
 
-.button.small {
-  padding: 8px 14px;
-  font-size: 14px;
-}
+        .button.small {
+        padding: 8px 14px;
+        font-size: 14px;
+        }
 
-.button.disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-  .toggle-button {
-  display: inline-block;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  padding: 8px 14px;
-  background-color: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.toggle-button:hover {
-  background-color: #e0e0e0;
-}
-.button.red {
-  background-color: #c0392b;
-}
-.button.red:hover {
-  background-color: #922b21;
-}
+        .button.disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+        }
+        .toggle-button {
+        display: inline-block;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        padding: 8px 14px;
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        cursor: pointer;
+        }
+        .toggle-button:hover {
+        background-color: #e0e0e0;
+        }
+        .button.red {
+        background-color: #c0392b;
+        }
+        .button.red:hover {
+        background-color: #922b21;
+        }
 
-    </style>';
+            </style>';
 }
 add_action('wp_head', 'custom_button_styles');
 

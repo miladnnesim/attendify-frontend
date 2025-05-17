@@ -20,17 +20,9 @@ class CompanyProducer {
         );
 
         $this->channel = $this->connection->channel();
-
-        $this->channel->exchange_declare(
-            $this->exchange,
-            'direct',
-            false,
-            true,
-            false
-        );
     }
 
-    public function sendCompanyData(array $data, string $operation = 'register') {
+    public function sendCompanyData(array $data, string $operation = 'create') {
         $xml = $this->buildXML($data, $operation);
         $msg = new AMQPMessage($xml, [
             'content_type' => 'application/xml',
@@ -48,42 +40,52 @@ class CompanyProducer {
         $xml = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?>
 <attendify xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="company_be.xsd" />');
 
-$info = $xml->addChild('info');
-$info->addChild('sender', 'frontend');
-$info->addChild('operation', $operation);
+        $info = $xml->addChild('info');
+        $info->addChild('sender', 'frontend');
+        $info->addChild('operation', $operation);
 
-$companies = $xml->addChild('companies');
-$company = $companies->addChild('company');
+        $companies = $xml->addChild('companies');
+        $company = $companies->addChild('company');
 
-$company->addChild('uid', htmlspecialchars($data['uid']));
-$company->addChild('companyNumber', htmlspecialchars($data['companyNumber']));
-$company->addChild('name', htmlspecialchars($data['name']));
-$company->addChild('VATNumber', htmlspecialchars($data['VATNumber']));
+        // Nodig voor elke operatie
+        $company->addChild('uid', htmlspecialchars($data['uid']));
 
-$address = $company->addChild('address');
-$address->addChild('street', htmlspecialchars($data['street']));
-$address->addChild('number', htmlspecialchars($data['number']));
-$address->addChild('postcode', htmlspecialchars($data['postcode']));
-$address->addChild('city', htmlspecialchars($data['city']));
+        // Alleen bij create of update
+        if (in_array($operation, ['create', 'update'])) {
+            $company->addChild('companyNumber', htmlspecialchars($data['companyNumber']));
+            $company->addChild('name', htmlspecialchars($data['name']));
+            $company->addChild('VATNumber', htmlspecialchars($data['VATNumber']));
 
-$billingAddress = $company->addChild('billingAddress');
-$billingAddress->addChild('street', htmlspecialchars($data['billing_street']));
-$billingAddress->addChild('number', htmlspecialchars($data['billing_number']));
-$billingAddress->addChild('postcode', htmlspecialchars($data['billing_postcode']));
-$billingAddress->addChild('city', htmlspecialchars($data['billing_city']));
+            $address = $company->addChild('address');
+            $address->addChild('street', htmlspecialchars($data['street']));
+            $address->addChild('number', htmlspecialchars($data['number']));
+            $address->addChild('postcode', htmlspecialchars($data['postcode']));
+            $address->addChild('city', htmlspecialchars($data['city']));
 
-$company->addChild('email', htmlspecialchars($data['email']));
-$company->addChild('phone', htmlspecialchars($data['phone']));
+            $billingAddress = $company->addChild('billingAddress');
+            $billingAddress->addChild('street', htmlspecialchars($data['billing_street']));
+            $billingAddress->addChild('number', htmlspecialchars($data['billing_number']));
+            $billingAddress->addChild('postcode', htmlspecialchars($data['billing_postcode']));
+            $billingAddress->addChild('city', htmlspecialchars($data['billing_city']));
 
-return $xml->asXML();
-}
+            $company->addChild('email', htmlspecialchars($data['email']));
+            $company->addChild('phone', htmlspecialchars($data['phone']));
 
-public function __destruct() {
-if ($this->channel) {
-$this->channel->close();
-}
-if ($this->connection) {
-$this->connection->close();
-}
-}
+            // owner_id optioneel maar sterk aangeraden
+            if (!empty($data['owner_id'])) {
+                $company->addChild('owner_id', htmlspecialchars($data['owner_id']));
+            }
+        }
+
+        return $xml->asXML();
+    }
+
+    public function __destruct() {
+        if ($this->channel) {
+            $this->channel->close();
+        }
+        if ($this->connection) {
+            $this->connection->close();
+        }
+    }
 }

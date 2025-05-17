@@ -1,4 +1,7 @@
 FROM wordpress:latest
 
+RUN ln -sf /dev/stdout /var/log/apache2/access.log && \
+    ln -sf /dev/stderr /var/log/apache2/error.log
+
 # Install the sockets extension
 RUN docker-php-ext-install sockets
