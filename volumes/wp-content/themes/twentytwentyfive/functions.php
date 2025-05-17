@@ -399,7 +399,7 @@ function render_user_payments() {
         $bedrag = number_format($betaling->entrance_fee, 2);
 
         echo "<tr style='border-bottom: 1px solid #ccc;'>
-            <td>" . esc_html($betaling->title ?? '[Onbekend event]') . "</td>
+            <td>" . esc_html($betaling->title ?? 'Evenement niet gevonden') . "</td>
             <td>$datum</td>
             <td>€$bedrag</td>
             <td>$status</td>
