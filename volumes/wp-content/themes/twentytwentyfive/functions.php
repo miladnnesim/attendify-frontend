@@ -223,8 +223,8 @@ function um_account_content_hook_extra_info($output, $tab_id) {
     // Start de output
     ob_start();
     ?>
-    <div class="um-form">
-        <?php
+<div class="um-form">
+    <?php
         if (!$fields_displayed) {
             echo '<p>Geen bewerkbare velden gevonden in het registratieformulier.</p>';
         } else {
@@ -234,8 +234,8 @@ function um_account_content_hook_extra_info($output, $tab_id) {
             }
         }
         ?>
-    </div>
-    <?php
+</div>
+<?php
     $output .= ob_get_clean();
     return $output;
 }
@@ -362,6 +362,57 @@ function set_activation_key(WP_REST_Request $request) {
     ]);
 }
 
+function render_user_payments() {
+    if (!is_user_logged_in()) {
+        return '<p>Je moet ingelogd zijn om je betalingen te bekijken.</p>';
+    }
+
+    global $wpdb;
+    $user_id = get_current_user_id();
+    $uid = get_user_meta($user_id, 'uid', true);
+
+    if (empty($uid)) {
+        return '<p>Geen UID gevonden voor deze gebruiker.</p>';
+    }
+
+    // Haal de betalingen op
+    $betalingen = $wpdb->get_results($wpdb->prepare("
+        SELECT ep.event_id, ep.entrance_fee, ep.entrance_paid, ep.paid_at, e.title
+        FROM event_payments ep
+        LEFT JOIN wp_events e ON ep.event_id = e.uid
+        WHERE ep.uid = %s
+        ORDER BY ep.paid_at DESC
+    ", $uid));
+
+    if (empty($betalingen)) {
+        return '<p>Er zijn nog geen betalingen geregistreerd.</p>';
+    }
+
+    ob_start();
+    echo '<div class="payment-list">';
+    echo '<table style="width: 100%; border-collapse: collapse;">';
+    echo '<thead><tr><th>Event</th><th>Datum</th><th>Bedrag</th><th>Status</th></tr></thead><tbody>';
+
+    foreach ($betalingen as $betaling) {
+        $status = $betaling->entrance_paid ? '✅ Betaald' : '❌ Niet betaald';
+        $datum = $betaling->paid_at ? date('d/m/Y', strtotime($betaling->paid_at)) : '-';
+        $bedrag = number_format($betaling->entrance_fee, 2);
+
+        echo "<tr style='border-bottom: 1px solid #ccc;'>
+            <td>" . esc_html($betaling->title ?? 'Evenement niet gevonden') . "</td>
+            <td>$datum</td>
+            <td>€$bedrag</td>
+            <td>$status</td>
+        </tr>";
+    }
+
+    echo '</tbody></table></div>';
+
+    return ob_get_clean();
+}
+add_shortcode('mijn_betalingen', 'render_user_payments');
+
+
 function render_event_session_page() {
     $html = '';
 
@@ -390,18 +441,20 @@ function render_event_session_page() {
         $html .= "<p><strong>Locatie:</strong> " . esc_html($event->location) . "</p>";
         $html .= "<p><strong>Datum:</strong> " . esc_html($event->start_date) . " tot " . esc_html($event->end_date) . "</p>";
         $html .= "<p>" . esc_html($event->description) . "</p>";
-
+    
+        $is_registered = false;
+    
         if ($is_logged_in) {
             $is_registered = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM user_event WHERE user_id = %s AND event_id = %s",
                 $current_user_uid,
                 $event->uid
             ));
-
+    
             if ($is_registered) {
                 $html .= "<p class='registered'>✅ Je bent al geregistreerd voor dit event.</p>";
-            
-                // Voeg Google Calendar knop toe
+    
+                // Google Calendar knop
                 date_default_timezone_set('Europe/Brussels');
                 $start = date('Ymd\THis\Z', strtotime($event->start_date));
                 $end = date('Ymd\THis\Z', strtotime($event->end_date));
@@ -411,15 +464,26 @@ function render_event_session_page() {
                     'details'  => $event->description,
                     'location' => $event->location
                 ]);
-            
+    
                 $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Voeg toe aan Google Calendar</a>';
-            
+    
                 $html .= '<form method="POST" action="/unregisterevent">';
                 $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
                 $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
                 $html .= '</form>';
+            } else {
+                $html .= '<form method="POST" action="/registerevent">';
+                $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
+                $html .= '<button type="submit" class="button">Registreer voor event</button>';
+                $html .= '</form>';
             }
+        } else {
+            $html .= '<button class="button disabled" disabled>Log in om te registreren</button>';
         }
+
+    
+        
+
     
     
         // Sessies
@@ -455,12 +519,17 @@ function render_event_session_page() {
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
                         $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
                         $html .= '</form>';
-                    } else {
+                    } elseif ($is_registered) {
+                        // Alleen registreren voor sessie als je voor event geregistreerd bent
                         $html .= '<form method="POST" action="/registerevent">';
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
                         $html .= '<button type="submit" class="button small">Registreer voor sessie</button>';
                         $html .= '</form>';
+                    } else {
+                        // Niet mogelijk sessie te registreren zonder event
+                        $html .= '<button class="button small disabled" disabled>Registreer eerst voor het event</button>';
                     }
+                    
                 } else {
                     $html .= '<button class="button small disabled" disabled>Log in om te registreren</button>';
                 }
@@ -476,70 +545,70 @@ function render_event_session_page() {
 
     $html .= "</div>";
     $html .= <<<JS
-<script>
-function toggleSessions(id) {
-    const element = document.getElementById(id);
-    element.style.display = element.style.display === "none" ? "block" : "none";
-}
-</script>
-JS;
+    <script>
+    function toggleSessions(id) {
+        const element = document.getElementById(id);
+        element.style.display = element.style.display === "none" ? "block" : "none";
+    }
+    </script>
+    JS;
 
     return $html;
 }
 
 
 function custom_button_styles() {
-    echo '<style>
-    .button {
-  display: inline-block;
-  padding: 10px 18px;
-  font-size: 15px;
-  font-weight: 600;
-  text-align: center;
-  text-decoration: none;
-  background-color: #0073aa;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  transition: background-color 0.3s ease;
-  cursor: pointer;
-  margin-top: 8px;
-}
+            echo '<style>
+            .button {
+        display: inline-block;
+        padding: 10px 18px;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+        background-color: #0073aa;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        transition: background-color 0.3s ease;
+        cursor: pointer;
+        margin-top: 8px;
+        }
 
-.button:hover {
-  background-color: #005a8c;
-}
+        .button:hover {
+        background-color: #005a8c;
+        }
 
-.button.small {
-  padding: 8px 14px;
-  font-size: 14px;
-}
+        .button.small {
+        padding: 8px 14px;
+        font-size: 14px;
+        }
 
-.button.disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-  .toggle-button {
-  display: inline-block;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  padding: 8px 14px;
-  background-color: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.toggle-button:hover {
-  background-color: #e0e0e0;
-}
-.button.red {
-  background-color: #c0392b;
-}
-.button.red:hover {
-  background-color: #922b21;
-}
+        .button.disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+        }
+        .toggle-button {
+        display: inline-block;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        padding: 8px 14px;
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        cursor: pointer;
+        }
+        .toggle-button:hover {
+        background-color: #e0e0e0;
+        }
+        .button.red {
+        background-color: #c0392b;
+        }
+        .button.red:hover {
+        background-color: #922b21;
+        }
 
-    </style>';
+            </style>';
 }
 add_action('wp_head', 'custom_button_styles');
 
@@ -647,6 +716,17 @@ add_action('init', function () {
         }
     }
 });
+function um_company_choices_callback() {
+    global $wpdb;
+    $results = $wpdb->get_results("SELECT uid, name FROM companies", ARRAY_A);
+
+    $options = array();
+    foreach ($results as $company) {
+        $options[$company['uid']] = $company['name'];
+    }
+
+    return $options;
+}
 
 add_shortcode('event_session_list', 'render_event_session_page');
 
