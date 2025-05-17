@@ -362,6 +362,57 @@ function set_activation_key(WP_REST_Request $request) {
     ]);
 }
 
+function render_user_payments() {
+    if (!is_user_logged_in()) {
+        return '<p>Je moet ingelogd zijn om je betalingen te bekijken.</p>';
+    }
+
+    global $wpdb;
+    $user_id = get_current_user_id();
+    $uid = get_user_meta($user_id, 'uid', true);
+
+    if (empty($uid)) {
+        return '<p>Geen UID gevonden voor deze gebruiker.</p>';
+    }
+
+    // Haal de betalingen op
+    $betalingen = $wpdb->get_results($wpdb->prepare("
+        SELECT ep.event_id, ep.entrance_fee, ep.entrance_paid, ep.paid_at, e.title
+        FROM event_payments ep
+        LEFT JOIN wp_events e ON ep.event_id = e.uid
+        WHERE ep.uid = %s
+        ORDER BY ep.paid_at DESC
+    ", $uid));
+
+    if (empty($betalingen)) {
+        return '<p>Er zijn nog geen betalingen geregistreerd.</p>';
+    }
+
+    ob_start();
+    echo '<div class="payment-list">';
+    echo '<table style="width: 100%; border-collapse: collapse;">';
+    echo '<thead><tr><th>Event</th><th>Datum</th><th>Bedrag</th><th>Status</th></tr></thead><tbody>';
+
+    foreach ($betalingen as $betaling) {
+        $status = $betaling->entrance_paid ? '✅ Betaald' : '❌ Niet betaald';
+        $datum = $betaling->paid_at ? date('d/m/Y', strtotime($betaling->paid_at)) : '-';
+        $bedrag = number_format($betaling->entrance_fee, 2);
+
+        echo "<tr style='border-bottom: 1px solid #ccc;'>
+            <td>" . esc_html($betaling->title ?? '[Onbekend event]') . "</td>
+            <td>$datum</td>
+            <td>€$bedrag</td>
+            <td>$status</td>
+        </tr>";
+    }
+
+    echo '</tbody></table></div>';
+
+    return ob_get_clean();
+}
+add_shortcode('mijn_betalingen', 'render_user_payments');
+
+
 function render_event_session_page() {
     $html = '';
 
