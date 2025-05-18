@@ -363,3 +363,45 @@ function set_activation_key(WP_REST_Request $request) {
 
 
 add_action('init', 'twentytwentyfive_register_block_bindings');
+
+// Verberg of disable sessie-registratieknop als user niet geregistreerd is voor event
+add_filter('the_content', 'verberg_registratieknop_voor_niet_ingeschreven_gebruikers');
+function verberg_registratieknop_voor_niet_ingeschreven_gebruikers($content) {
+    if (is_singular('post') || is_singular('event')) {
+        $user_id = get_current_user_id();
+        $event_id = get_the_ID();
+
+        // Voorbeeld: controle via user_meta
+        $is_registered = get_user_meta($user_id, 'registered_event_' . $event_id, true);
+
+        if ($is_registered !== 'yes') {
+            // Zoek naar een registratieknop in de content en vervang/verwijder
+            $content = str_replace(
+                '<button class="register-session">Registreer voor sessie</button>',
+                '<p style="color: red;"><strong> Je moet je eerst registreren voor dit event om sessies te bekijken of je in te schrijven.</strong></p>',
+                $content
+            );
+        }
+    }
+
+    return $content;
+}
+
+// Voeg automatisch de registratieknop toe aan de content, alleen als gebruiker is geregistreerd
+add_filter('the_content', 'toon_registratieknop_als_ingeschreven');
+function toon_registratieknop_als_ingeschreven($content) {
+    if (is_singular('post') || is_singular('event')) {
+        $user_id = get_current_user_id();
+        $event_id = get_the_ID();
+
+        $is_registered = get_user_meta($user_id, 'registered_event_' . $event_id, true);
+
+        if ($is_registered === 'yes') {
+            $knop_html = '<p><button class="register-session">Registreer voor sessie</button></p>';
+            $content .= $knop_html; // Voeg knop toe onderaan content
+        } else {
+            $content .= '<p style="color: red;"><strong> Je moet je eerst registreren voor dit event om sessies te bekijken of je in te schrijven.</strong></p>';
+        }
+    }
+    return $content;
+}
