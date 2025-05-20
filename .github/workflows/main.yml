@@ -60,7 +60,7 @@ jobs:
           port: 60022
           script: |
             cd ~/attendify/test-environment/testing-Frontend/attendify-frontend
-            sudo git reset --hard origin/test
+            git reset --hard origin/test
             git pull origin test
             docker compose down
             docker compose -f docker-compose.yaml -f docker-compose.test.yaml up -d --build
@@ -81,7 +81,7 @@ jobs:
           port: 60022
           script: |
             cd ~/attendify/attendify-frontend
-            sudo git reset --hard origin/main
+            git reset --hard origin/main
             git pull origin main
             docker compose down 
             docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d --build
