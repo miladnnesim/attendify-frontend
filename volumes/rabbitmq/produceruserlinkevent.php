@@ -26,6 +26,7 @@ function sendRegistrationMessage($type, $user_id, $entity_id, $operation = 'crea
 <attendify>
   <info>
     <operation>$operation</operation>
+    <sender>frontend</sender>
   </info>
   <event_attendee>
     <uid>$user_id</uid>
@@ -38,6 +39,7 @@ XML;
 <attendify>
   <info>
     <operation>$operation</operation>
+    <sender>frontend</sender>
   </info>
   <session_attendee>
     <uid>$user_id</uid>
