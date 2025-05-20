@@ -96,6 +96,8 @@ function company_register_form_shortcode() {
     }
 
     if ($success) {
+        $producer = new CompanyProducer();
+        $producer->sendCompanyData($company_data, 'create');
         echo "<p style='color:green;'>✅ The company was successfully saved in the database.</p>";
     }
 
