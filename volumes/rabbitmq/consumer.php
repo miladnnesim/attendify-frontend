@@ -182,12 +182,12 @@ class RabbitMQ_Consumer {
     
     private function sendToMailingQueue($messageData) {
         $exchange = 'user-management';
-        $routing_key = 'user.passwordGenerated'; // juiste template
-
-        $message = new AMQPMessage($messageData);
+        $routing_key = 'user.passwordGenerated';
+        $message = new AMQPMessage($messageData, ['content_type' => 'text/xml']);
         $this->channel->basic_publish($message, $exchange, $routing_key);
-        error_log("Sent passwordGenerated mail for user {$messageData}");
+        error_log("Sent passwordGenerated mail for user");
     }
+
 
  
     private function createUser(SimpleXMLElement $userNode, $sender) {
@@ -221,7 +221,7 @@ class RabbitMQ_Consumer {
         $hashed_activation_key = null;
 
         if ($sender == 'CRM' || $sender == 'Odoo') {
-            $wp_host = getenv('WORDPRESS_HOST');
+            $wp_host = rtrim(getenv('WORDPRESS_HOST'), '/');
             $api_url = "http://wordpress:80/?rest_route=/myapiv2/set-activation-key";
             error_log("API URL: " . $api_url);
 
@@ -255,12 +255,17 @@ class RabbitMQ_Consumer {
             if (isset($response_data['hashed_activation_key'])) {
                 $hashed_activation_key = $response_data['hashed_activation_key'];
 
-            $messageData = [
-                "dto" => [
-                    "user" => $email,
-                    "activationLink" => $wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email)
-                ]
-            ];
+            $activationLink = $wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email);
+
+            $xmlMessage = <<<XML
+            <mail>
+                <user>{$email}</user>
+                <activationLink>{$activationLink}</activationLink>
+            </mail>
+            XML;
+
+            $this->sendToMailingQueue($xmlMessage);
+
             $this->sendToMailingQueue(json_encode($messageData));
 
 
