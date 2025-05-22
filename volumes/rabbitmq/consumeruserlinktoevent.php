@@ -118,12 +118,12 @@ class RegistrationConsumer {
         $table = $type === 'event' ? 'user_event' : 'user_session';
         $column = $type === 'event' ? 'event_id' : 'session_id';
 
-        if ($operation === 'create') {
+        if ($operation === 'register') {
             $stmt = $this->db->prepare("INSERT IGNORE INTO `$table` (user_id, `$column`) VALUES (:uid, :eid)");
             $stmt->execute([':uid' => $user_id, ':eid' => $entity_id]);
             error_log("✅ Gebruiker $user_id geregistreerd voor $type $entity_id");
 
-        } elseif ($operation === 'delete') {
+        } elseif ($operation === 'unregister') {
             $stmt = $this->db->prepare("DELETE FROM `$table` WHERE user_id = :uid AND `$column` = :eid");
             $stmt->execute([':uid' => $user_id, ':eid' => $entity_id]);
             error_log("❌ Registratie verwijderd van gebruiker $user_id voor $type $entity_id");

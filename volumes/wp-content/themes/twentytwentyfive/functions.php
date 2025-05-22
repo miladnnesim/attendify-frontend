@@ -456,8 +456,9 @@ function render_event_session_page() {
     
                 // Google Calendar knop
                 date_default_timezone_set('Europe/Brussels');
-                $start = date('Ymd\THis\Z', strtotime($event->start_date));
-                $end = date('Ymd\THis\Z', strtotime($event->end_date));
+                $start = date('Ymd\THis\Z', strtotime($event->start_date . ' ' . $event->start_time));
+                $end   = date('Ymd\THis\Z', strtotime($event->end_date   . ' ' . $event->end_time));
+
                 $calendar_url = 'https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
                     'text'     => $event->title,
                     'dates'    => $start . '/' . $end,
@@ -519,6 +520,18 @@ function render_event_session_page() {
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
                         $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
                         $html .= '</form>';
+                        date_default_timezone_set('Europe/Brussels');
+                        $start = date('Ymd\THis\Z', strtotime($session->date . ' ' . $session->start_time));
+                        $end   = date('Ymd\THis\Z', strtotime($session->date . ' ' . $session->end_time));
+                        $calendar_url = 'https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                            'text'     => $session->title,
+                            'dates'    => $start . '/' . $end,
+                            'details'  => $session->description,
+                            'location' => $session->location
+                        ]);
+
+                        $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Voeg toe aan Google Calendar</a>';
+
                     } elseif ($is_registered) {
                         // Alleen registreren voor sessie als je voor event geregistreerd bent
                         $html .= '<form method="POST" action="/registerevent">';
@@ -635,10 +648,10 @@ add_action('init', function () {
 
         try {
             if ($session_uid) {
-                sendRegistrationMessage('session', $uid, $session_uid, 'delete');
+                sendRegistrationMessage('session', $uid, $session_uid, 'unregister');
                 wp_redirect(add_query_arg('unregistered', 'session', wp_get_referer()));
             } elseif ($event_uid) {
-                sendRegistrationMessage('event', $uid, $event_uid, 'delete');
+                sendRegistrationMessage('event', $uid, $event_uid, 'unregister');
                 wp_redirect(add_query_arg('unregistered', 'event', wp_get_referer()));
             } else {
                 wp_die('Ongeldige annuleringsgegevens.');
