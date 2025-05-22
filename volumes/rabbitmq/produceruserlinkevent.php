@@ -4,7 +4,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
-function sendRegistrationMessage($type, $user_id, $entity_id, $operation = 'create') {
+function sendRegistrationMessage($type, $user_id, $entity_id, $operation = 'register') {
     if (!in_array($type, ['event', 'session'])) {
         throw new Exception("❌ Onbekend type '$type'. Moet 'event' of 'session' zijn.");
     }
