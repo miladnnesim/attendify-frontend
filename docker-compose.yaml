@@ -181,6 +181,7 @@ services:
       - LOCAL_DB_NAME=${LOCAL_DB_NAME}
     depends_on:
       - db
+    restart: on-failure
     networks:
       - frontend_net
 
