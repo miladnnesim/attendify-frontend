@@ -182,60 +182,58 @@ class RabbitMQ_Consumer {
     
     private function sendToMailingQueue($messageData) {
         $exchange = 'user-management';
-        $queue = 'mailing.mail';
-        $routing_key = 'user.passwordReset';
-   
-   
-        // Publish the message
-        $message = new AMQPMessage($messageData);
+        $routing_key = 'user.passwordGenerated';
+        $message = new AMQPMessage($messageData, ['content_type' => 'text/xml']);
         $this->channel->basic_publish($message, $exchange, $routing_key);
-                error_log("Sent activation link to mailing.mail queue for user {$messageData}");
+        error_log("Sent passwordGenerated mail for user");
     }
+
+
  
     private function createUser(SimpleXMLElement $userNode, $sender) {
         $email = $this->sanitizeField($userNode->email);
         $display_name = $this->sanitizeField($userNode->first_name . ' ' . $userNode->last_name);
         $uid = $this->sanitizeField($userNode->uid); // <-- UID ophalen uit XML
-        
+
         if (empty($uid)) {
             throw new Exception("UID is verplicht bij create operatie");
         }
-    
+
         error_log("Received UID from message: $uid");
-    
+
         // Check if user already exists by UID
         $checkUidQuery = "SELECT user_id FROM {$this->table_prefix}_usermeta WHERE meta_key = 'uid' AND meta_value = :uid LIMIT 1";
         $checkUidStmt = $this->db->prepare($checkUidQuery);
         $checkUidStmt->execute([':uid' => $uid]);
         $existingUserByUid = $checkUidStmt->fetch(PDO::FETCH_ASSOC);
-    
+
         if ($existingUserByUid) {
             error_log("User with UID '$uid' already exists with ID: " . $existingUserByUid['user_id'] . ". Skipping creation.");
             return;
         }
-    
+
         // Password ophalen
         $password = (string)$userNode->password;
         if (empty($password)) {
             throw new Exception("No password provided in user.register message from CRM/Odoo");
         }
-    
+
         $hashed_activation_key = null;
-    
+
         if ($sender == 'CRM' || $sender == 'Odoo') {
-            $wp_host = getenv('WORDPRESS_HOST');
+            $wp_host = rtrim(getenv('WORDPRESS_HOST'), '/');
             $api_url = "http://wordpress:80/?rest_route=/myapiv2/set-activation-key";
             error_log("API URL: " . $api_url);
-    
+
             $shared_secret = getenv('MY_API_SHARED_SECRET');
             if (!$shared_secret) {
                 error_log('Shared secret not set in environment variables!');
                 throw new Exception('Shared secret not configured');
             }
-    
+
             $random_bytes = random_bytes(16);
             $activation_key = bin2hex($random_bytes);
-    
+
             $data = json_encode(['activation_key' => $activation_key]);
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $api_url);
@@ -252,22 +250,36 @@ class RabbitMQ_Consumer {
                 throw new Exception('cURL error: ' . curl_error($ch));
             }
             curl_close($ch);
-    
+
             $response_data = json_decode($response, true);
             if (isset($response_data['hashed_activation_key'])) {
                 $hashed_activation_key = $response_data['hashed_activation_key'];
-                $this->sendToMailingQueue($wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email));
+
+            $activationLink = $wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email);
+
+            $xmlMessage = <<<XML
+            <mail>
+                <user>{$email}</user>
+                <activationLink>{$activationLink}</activationLink>
+            </mail>
+            XML;
+
+            $this->sendToMailingQueue($xmlMessage);
+
+            $this->sendToMailingQueue(json_encode($messageData));
+
+
                 echo 'Hashed Activation Key: ' . $hashed_activation_key;
             } else {
                 error_log('No hashed activation key found in response');
                 throw new Exception('Failed to retrieve hashed activation key');
             }
         }
-    
+
         if ($hashed_activation_key !== null) {
             $query = "INSERT INTO {$this->table_prefix}_users
-                      (user_login, user_pass, user_email, user_registered, display_name, user_activation_key)
-                      VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name, :user_activation_key)";
+                    (user_login, user_pass, user_email, user_registered, display_name, user_activation_key)
+                    VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name, :user_activation_key)";
             $stmt = $this->db->prepare($query);
             $stmt->execute([
                 ':user_login' => $email,
@@ -278,8 +290,8 @@ class RabbitMQ_Consumer {
             ]);
         } else {
             $query = "INSERT INTO {$this->table_prefix}_users
-                      (user_login, user_pass, user_email, user_registered, display_name)
-                      VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name)";
+                    (user_login, user_pass, user_email, user_registered, display_name)
+                    VALUES (:user_login, :user_pass, :user_email, NOW(), :display_name)";
             $stmt = $this->db->prepare($query);
             $stmt->execute([
                 ':user_login' => $email,
@@ -288,14 +300,14 @@ class RabbitMQ_Consumer {
                 ':display_name' => $display_name
             ]);
         }
-    
+
         $user_id = $this->db->lastInsertId();
         error_log("Inserted user with auto-increment ID: $user_id");
         $isAdmin = strtolower((string)($userNode->is_admin ?? 'false')) === 'true';
 
         // Insert user meta fields
         $metaFields = [
-            'uid' => $uid, // <-- Extra: hier UID opslaan in usermeta
+            'uid' => $uid,
             'nickname' => $email,
             'first_name' => $this->sanitizeField($userNode->first_name),
             'last_name' => $this->sanitizeField($userNode->last_name),
@@ -313,11 +325,11 @@ class RabbitMQ_Consumer {
             'wp_user_level'   => $isAdmin ? '10' : '0',
             'is_admin'        => $isAdmin ? '1' : '0'
         ];
-    
+
         $metaQuery = "INSERT INTO {$this->table_prefix}_usermeta (user_id, meta_key, meta_value)
-                      VALUES (:user_id, :meta_key, :meta_value)";
+                    VALUES (:user_id, :meta_key, :meta_value)";
         $metaStmt = $this->db->prepare($metaQuery);
-    
+
         foreach ($metaFields as $key => $value) {
             if (!empty($key)) {
                 $metaStmt->execute([
@@ -327,9 +339,10 @@ class RabbitMQ_Consumer {
                 ]);
             }
         }
-    
+
         error_log("Created user with ID: $user_id, stored UID $uid, role: " . ($isAdmin ? 'admin' : 'subscriber'));
     }
+
     
    
     private function makeHttpRequest($url, $args) {

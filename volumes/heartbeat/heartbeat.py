@@ -144,7 +144,6 @@ def main():
                     all_running = False
                 color = GREEN if status else RED
                 status_text = f"{color}{'UP' if status else 'DOWN'}{RESET}"
-                logging.info(f"Heartbeat check for {container_name} - Status: {status_text}")
 
                 if status:
                     message = create_heartbeat_message(container_name)
@@ -155,8 +154,7 @@ def main():
                         properties=pika.BasicProperties(delivery_mode=2)
                     )
 
-            if not all_running:
-                logging.info(f"{RED}Skipping heartbeat send: one or more containers DOWN{RESET}")
+
 
             time.sleep(1)
     except KeyboardInterrupt:
