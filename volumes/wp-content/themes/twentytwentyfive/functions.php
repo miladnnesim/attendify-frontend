@@ -364,7 +364,7 @@ function set_activation_key(WP_REST_Request $request) {
 
 function render_user_payments() {
     if (!is_user_logged_in()) {
-        return '<p>Je moet ingelogd zijn om je betalingen te bekijken.</p>';
+        return '<p>You must be logged in to view your payments.</p>';
     }
 
     global $wpdb;
@@ -372,7 +372,7 @@ function render_user_payments() {
     $uid = get_user_meta($user_id, 'uid', true);
 
     if (empty($uid)) {
-        return '<p>Geen UID gevonden voor deze gebruiker.</p>';
+        return '<p>No UID found for this user.</p>';
     }
 
     // Haal de betalingen op
@@ -385,7 +385,7 @@ function render_user_payments() {
     ", $uid));
 
     if (empty($betalingen)) {
-        return '<p>Er zijn nog geen betalingen geregistreerd.</p>';
+        return '<p>No payments have been registered yet.</p>';
     }
 
     ob_start();
@@ -394,12 +394,12 @@ function render_user_payments() {
     echo '<thead><tr><th>Event</th><th>Datum</th><th>Bedrag</th><th>Status</th></tr></thead><tbody>';
 
     foreach ($betalingen as $betaling) {
-        $status = $betaling->entrance_paid ? '✅ Betaald' : '❌ Niet betaald';
+        $status = $betaling->entrance_paid ? '✅ Paid' : '❌ Not Paid';
         $datum = $betaling->paid_at ? date('d/m/Y', strtotime($betaling->paid_at)) : '-';
         $bedrag = number_format($betaling->entrance_fee, 2);
 
         echo "<tr style='border-bottom: 1px solid #ccc;'>
-            <td>" . esc_html($betaling->title ?? 'Evenement niet gevonden') . "</td>
+            <td>" . esc_html($betaling->title ?? 'Event not found') . "</td>
             <td>$datum</td>
             <td>€$bedrag</td>
             <td>$status</td>
