@@ -220,7 +220,7 @@ class RabbitMQ_Consumer {
 
         $hashed_activation_key = null;
 
-        if ($sender == 'CRM' || $sender == 'Odoo') {
+        if ($sender == 'CRM' || $sender == 'Odoo'|| $sender == 'crm'|| $sender == 'odoo') {
             $wp_host = rtrim(getenv('WORDPRESS_HOST'), '/');
             $api_url = "http://wordpress:80/?rest_route=/myapiv2/set-activation-key";
             error_log("API URL: " . $api_url);
@@ -255,7 +255,7 @@ class RabbitMQ_Consumer {
             if (isset($response_data['hashed_activation_key'])) {
                 $hashed_activation_key = $response_data['hashed_activation_key'];
 
-            $activationLink = htmlspecialchars($wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email));
+            $activationLink = htmlspecialchars($wp_host . "/account-activeren/?key=" . $activation_key . "&login=" . rawurlencode($email));
             $emailEscaped = htmlspecialchars($email);
 
             $xmlMessage = <<<XML
@@ -266,9 +266,6 @@ class RabbitMQ_Consumer {
             XML;
 
             $this->sendToMailingQueue($xmlMessage);
-
-
-
 
                 echo 'Hashed Activation Key: ' . $hashed_activation_key;
             } else {

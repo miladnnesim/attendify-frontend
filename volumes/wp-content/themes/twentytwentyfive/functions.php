@@ -743,4 +743,43 @@ function um_company_choices_callback() {
 
 add_shortcode('event_session_list', 'render_event_session_page');
 
+function activate_account_shortcode() {
+    if (isset($_GET['key']) && isset($_GET['login'])) {
+        $key = sanitize_text_field($_GET['key']);
+        $login = sanitize_text_field($_GET['login']);
+
+        ob_start();
+        echo '<h2>Kies een nieuw wachtwoord voor ' . esc_html($login) . '</h2>';
+        echo '<form method="post">';
+        echo '<input type="hidden" name="rp_key" value="' . esc_attr($key) . '">';
+        echo '<input type="hidden" name="rp_login" value="' . esc_attr($login) . '">';
+        echo '<p><input type="password" name="new_pass" placeholder="Nieuw wachtwoord" required></p>';
+        echo '<p><input type="password" name="new_pass_repeat" placeholder="Herhaal wachtwoord" required></p>';
+        echo '<p><button type="submit" name="set_password">Wachtwoord instellen</button></p>';
+        echo '</form>';
+
+        if (isset($_POST['set_password'])) {
+            $user = check_password_reset_key($key, $login);
+            if (!is_wp_error($user)) {
+                $new_pass = $_POST['new_pass'];
+                $repeat = $_POST['new_pass_repeat'];
+
+                if ($new_pass === $repeat) {
+                    reset_password($user, $new_pass);
+                    echo '<p>✅ Wachtwoord ingesteld. <a href="' . wp_login_url() . '">Inloggen</a></p>';
+                } else {
+                    echo '<p style="color:red;">❌ Wachtwoorden komen niet overeen.</p>';
+                }
+            } else {
+                echo '<p style="color:red;">❌ Ongeldige of verlopen link.</p>';
+            }
+        }
+
+        return ob_get_clean();
+    } else {
+        return '<p>❌ Geen activatiegegevens gevonden in de URL.</p>';
+    }
+}
+add_shortcode('activate_account', 'activate_account_shortcode');
+
 add_action('init', 'twentytwentyfive_register_block_bindings');
