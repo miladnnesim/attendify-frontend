@@ -255,18 +255,19 @@ class RabbitMQ_Consumer {
             if (isset($response_data['hashed_activation_key'])) {
                 $hashed_activation_key = $response_data['hashed_activation_key'];
 
-            $activationLink = $wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email);
+            $activationLink = htmlspecialchars($wp_host . "/wp-login.php?action=rp&key=" . $activation_key . "&login=" . rawurlencode($email));
+            $emailEscaped = htmlspecialchars($email);
 
             $xmlMessage = <<<XML
             <mail>
-                <user>{$email}</user>
-                <activationLink>{$activationLink}</activationLink>
+            <user>{$emailEscaped}</user>
+            <activationLink>{$activationLink}</activationLink>
             </mail>
             XML;
 
             $this->sendToMailingQueue($xmlMessage);
 
-            $this->sendToMailingQueue(json_encode($messageData));
+
 
 
                 echo 'Hashed Activation Key: ' . $hashed_activation_key;
