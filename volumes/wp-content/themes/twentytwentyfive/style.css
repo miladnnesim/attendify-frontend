@@ -13,6 +13,7 @@ License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: twentytwentyfive
 Tags: one-column, custom-colors, custom-menu, custom-logo, editor-style, featured-images, full-site-editing, block-patterns, rtl-language-support, sticky-post, threaded-comments, translation-ready, wide-blocks, block-styles, style-variations, accessibility-ready, blog, portfolio, news
 */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
 
 /*
  * Link styles
@@ -59,3 +60,480 @@ h1, h2, h3, h4, h5, h6, blockquote, caption, figcaption, p {
 .more-link {
 	display: block;
 }
+
+
+/* ========== Custom Login Page Styles ========== */
+
+/* Header / Navigation */
+.login-header {
+	background-color: #f8f9f9;
+	padding: 1rem 0;
+  }
+  .header-container {
+	max-width: 1200px;
+	margin: 0 auto;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+  }
+  .logo-link img.logo {
+	height: 50px;
+  }
+  .site-nav .nav-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+  }
+  .site-nav .nav-list li {
+	margin-left: 2rem;
+  }
+  .site-nav .nav-list li a {
+	text-decoration: none;
+	color: #333;
+	font-weight: 500;
+  }
+  .site-nav .nav-list li a:hover {
+	color: #62A8D5;
+  }
+  
+  /* Hero Section */
+  .login-hero {
+	background-color: #2C3D47;
+	color: #fff;
+	padding: 4rem 1rem;
+  }
+  .hero-content {
+	max-width: 1200px;
+	margin: 0 auto;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+  }
+  .hero-left {
+	flex: 1 1 400px;
+  }
+  .hero-title {
+	font-size: 3.5rem;
+	margin: 0;
+	color: #d0d2d6;
+	font-family: 'Poppins', sans-serif;
+  }
+  .hero-subtitle {
+	font-size: 1.25rem;
+	margin: 1rem 0;
+  }
+  .hero-button {
+	display: inline-block;
+	background-color: #62A8D5;
+	color: #fff;
+	padding: 0.75rem 2rem;
+	border-radius: 30px;
+	text-decoration: none;
+	font-size: 1rem;
+	margin-top: 1rem;
+  }
+  .hero-button:hover {
+	background-color: #4c8cb4;
+  }
+  .hero-right {
+	flex: 1 1 300px;
+	/* Decorative graphics (waves, icons) could be added here */
+  }
+  
+  .login-form-section {
+	margin-top: -60px; /* overlap effect */
+	padding-bottom: 4rem;
+  }
+  .form-container {
+	background-color: #fff;
+	max-width: 400px;
+	margin: 0 auto;
+	padding: 2rem;
+	border-radius: 12px;
+	box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
+  }
+  .form-container h2 {
+	margin-top: 0;
+	margin-bottom: 1rem;
+	font-size: 1.75rem;
+	color: #333;
+  }
+  .form-container button.btn.hero-button {
+	background-color: #62A8D5;
+	border: none;
+	font-weight: 600;
+	font-size: 1rem;
+	padding: 0.75rem;
+	border-radius: 30px;
+	color: white;
+	cursor: pointer;
+  }
+  .form-container button.btn.hero-button:hover {
+	background-color: #4c8cb4;
+  }
+  .auth-link-text {
+	text-align: center;
+	margin-top: 1.5rem;
+	color: #555;
+  }
+  .auth-link-text a {
+	color: #62A8D5;
+	text-decoration: none;
+  }
+  .auth-link-text a:hover {
+	text-decoration: underline;
+  }
+  
+  /* Buttons (All events & Get In Touch) */
+  .btn {
+	text-align: center;
+	text-decoration: none;
+  }
+  .contact-button {
+	background-color: #62A8D5;
+	color: #fff;
+	padding: 0.75rem 1.5rem;
+	border-radius: 30px;
+	font-size: 1rem;
+  }
+  .contact-button:hover {
+	background-color: #4c8cb4;
+  }
+  
+  /* Footer Section */
+  .login-footer {
+	background-color: #2C3D47;
+	color: #d0d2d6;
+	padding: 2rem 1rem 1rem;
+  }
+  .footer-content {
+	max-width: 1200px;
+	margin: 0 auto;
+	display: flex;
+	flex-wrap: wrap;
+  }
+  .footer-col {
+	flex: 1 1 200px;
+	margin-bottom: 1.5rem;
+  }
+  .brand-col .footer-logo {
+	max-width: 150px;
+  }
+  .links-col h4 {
+	margin-bottom: 0.5rem;
+	color: #fff;
+  }
+  .links-col ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+  }
+  .links-col ul li {
+	margin-bottom: 0.5rem;
+  }
+  .links-col ul li a {
+	color: #d0d2d6;
+	text-decoration: none;
+  }
+  .links-col ul li a:hover {
+	color: #fff;
+  }
+  .contact-col {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+  }
+  .footer-bottom {
+	max-width: 1200px;
+	margin: 1rem auto 0;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	border-top: 1px solid #44575c;
+	padding-top: 1rem;
+  }
+  .footer-bottom .social-icons a {
+	margin-right: 1rem;
+	color: #d0d2d6;
+	text-decoration: none;
+	font-size: 1.2rem;
+  }
+  .footer-bottom .social-icons a:hover {
+	color: #fff;
+  }
+  .footer-email {
+	color: #d0d2d6;
+  }
+  .footer-copy {
+	color: #a0a3a8;
+  }
+  
+  /* Responsive Styles */
+  @media (max-width: 768px) {
+	.site-nav .nav-list {
+	  flex-direction: column;
+	  align-items: flex-start;
+	}
+	.site-nav .nav-list li {
+	  margin: 0.5rem 0;
+	}
+	.hero-content {
+	  flex-direction: column;
+	  text-align: center;
+	}
+	.hero-left, .hero-right {
+	  flex: 1 1 100%;
+	}
+	.footer-content {
+	  flex-direction: column;
+	  align-items: center;
+	  text-align: center;
+	}
+	.footer-content .footer-col {
+	  flex: 1 1 100%;
+	}
+	.footer-bottom {
+	  flex-direction: column;
+	  text-align: center;
+	}
+	.footer-bottom .social-icons {
+	  margin-bottom: 0.5rem;
+	}
+	body.custom-login-body {
+		margin: 0;
+		padding: 0;
+		background: #f0f0f0;
+	  }
+	  
+	  header, .site-header, .wp-site-blocks > header, .site-footer {
+		display: none !important;
+	  }
+	  
+	  /* Hero content centered with overlay */
+.hero-overlay {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	padding-top: 60px;
+  }
+  .hero-text {
+	text-align: center;
+  }
+  .hero-text .hero-title {
+	font-size: 4rem;
+	color: #e5e5e5;
+	margin-bottom: 0.5rem;
+	font-family: 'Poppins', sans-serif;
+  }
+  .hero-text .hero-subtitle {
+	font-size: 1.2rem;
+	color: #d0d0d0;
+  }
+  .full-width {
+	width: 100%;
+  }
+  
+  /* Login form wrapper to center it */
+  .form-wrapper {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 3rem 1rem 5rem;
+	background-color: #f0f0f0;
+  }
+  
+  /* Fix input field spacing */
+  .form-container input[type="text"],
+  .form-container input[type="email"],
+  .form-container input[type="password"] {
+	width: 100%;
+	padding: 0.6rem;
+	margin: 0.5rem 0 1rem;
+	border: 1px solid #ccc;
+	border-radius: 8px;
+  }
+  
+  /* Elevate button visual */
+  .form-container button.btn.hero-button {
+	background-color: #62A8D5;
+	border: none;
+	padding: 0.75rem;
+	font-size: 1rem;
+	border-radius: 30px;
+	color: white;
+	font-weight: 600;
+	margin-top: 1rem;
+	cursor: pointer;
+	transition: background-color 0.3s ease;
+  }
+  
+  .form-container button.btn.hero-button:hover {
+	background-color: #4c8cb4;
+  }
+  
+  }
+  /* 🔥 FULL BACKGROUND op de hele pagina */
+  .full-background {
+	background-image: url('../assets/images/backdrop.png');
+	background-size: cover;
+	background-position: center;
+	background-repeat: no-repeat;
+	min-height: 100vh; /* 🧠 zorgt dat de achtergrond de hele viewport vult */
+	display: flex;
+	flex-direction: column;
+  }
+  
+  /* Zorg dat alles leesbaar blijft */
+  .login-form-section {
+	display: flex;
+	justify-content: center;
+	padding: 1px 1rem 1rem; /* top, left/right, bottom */
+	backdrop-filter: blur(2px); /* optioneel: maakt het subtiel */
+  }
+  
+  .form-container {
+	background-color: rgba(255, 255, 255, 0.95);
+	padding: 2rem;
+	border-radius: 20px;
+	box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+	max-width: 420px;
+	width: 100%;
+  }
+  
+  .btn.hero-button {
+	background-color: #62A8D5;
+	border: none;
+	font-weight: 600;
+	padding: 0.75rem;
+	width: 100%;
+	color: white;
+	border-radius: 30px;
+	cursor: pointer;
+  }
+  
+  .btn.hero-button:hover {
+	background-color: #4a8bbf;
+  }
+  .login-footer {
+	margin-top: auto;
+  }
+  
+  
+  .home-hero {
+	padding: 4rem 1rem;
+	background-color: transparent; /* of een andere kleur die je wilt */
+	color: #fff;
+  }
+  
+  .home-hero-content {
+	max-width: 1200px;
+	margin: 0 auto;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+  }
+  
+  .home-hero-left {
+	flex: 1 1 400px;
+  }
+  
+  .home-hero-title {
+	font-size: 3.5rem;
+	margin: 0;
+	color: #d0d2d6;
+	font-family: 'Poppins', sans-serif;
+  }
+  
+  .home-hero-subtitle {
+	font-size: 1.25rem;
+	margin: 1rem 0;
+  }
+  
+  .home-hero-right {
+	flex: 1 1 300px;
+  }
+body.home {
+  background-image: url('assets/images/backdrop.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+  /* === HOMEPAGE HERO === */
+.home-hero {
+	min-height: 650px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2rem;
+  }
+  
+  .home-hero-content {
+	max-width: 1200px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2rem;
+	color: #fff;
+  }
+  
+  .home-hero-left {
+	flex: 1;
+  }
+  
+  .home-hero-title {
+	font-size: 3.5rem;
+	color: #d0d2d6;
+	margin: 0;
+  }
+  
+  .home-hero-subtitle {
+	font-size: 1.25rem;
+	margin: 1rem 0;
+  }
+  
+  .home-hero-button {
+	display: inline-block;
+	background-color: #62A8D5;
+	color: white;
+	padding: 0.75rem 2rem;
+	border-radius: 30px;
+	text-decoration: none;
+	font-weight: 600;
+	font-size: 1rem;
+	margin-top: 2rem;
+  }
+  
+  /* === HOMEPAGE FOOTER === */
+  .home-footer {
+	padding: 2rem 1rem;
+	background-color: rgba(0, 0, 0, 0.2);
+	color: #ccc;
+  }
+  
+  .home-footer-content {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 2rem;
+	max-width: 1100px;
+	margin: 0 auto;
+  }
+  
+  .home-footer .footer-col {
+	flex: 1 1 200px;
+  }
+  
+  .home-footer .footer-logo {
+	width: 80px;
+  }
+  
+  .home-footer-bottom {
+	text-align: center;
+	font-size: 0.875rem;
+	margin-top: 2rem;
+	color: #aaa;
+  }
+  
