@@ -168,23 +168,6 @@ services:
       - attendify_net
       - frontend_net
 
-  create-event-payments-table:
-    build:
-      context: .
-      dockerfile: dockerfile-db-migration-payments
-    volumes:
-      - ./volumes/scripts:/usr/src/app
-    environment:
-      - LOCAL_DB_HOST=${LOCAL_DB_HOST}
-      - LOCAL_DB_USER=${LOCAL_DB_USER}
-      - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
-      - LOCAL_DB_NAME=${LOCAL_DB_NAME}
-    depends_on:
-      - db
-    restart: on-failure
-    networks:
-      - frontend_net
-
   consumer-company:
     env_file: ./.env
     image: php:8.1-cli

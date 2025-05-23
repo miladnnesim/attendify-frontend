@@ -362,21 +362,17 @@ function set_activation_key(WP_REST_Request $request) {
     ]);
 }
 
-function render_user_payments() {
+function render_clean_event_overview() {
     if (!is_user_logged_in()) {
-        return '<p>You must be logged in to view your payments.</p>';
+        return '<p>You must be logged in to view your event payments and purchases.</p>';
     }
 
     global $wpdb;
     $user_id = get_current_user_id();
     $uid = get_user_meta($user_id, 'uid', true);
+    if (empty($uid)) return '<p>No UID found for this user.</p>';
 
-    if (empty($uid)) {
-        return '<p>No UID found for this user.</p>';
-    }
-
-    // Haal de betalingen op
-    $betalingen = $wpdb->get_results($wpdb->prepare("
+    $payments = $wpdb->get_results($wpdb->prepare("
         SELECT ep.event_id, ep.entrance_fee, ep.entrance_paid, ep.paid_at, e.title
         FROM event_payments ep
         LEFT JOIN wp_events e ON ep.event_id = e.uid
@@ -384,33 +380,167 @@ function render_user_payments() {
         ORDER BY ep.paid_at DESC
     ", $uid));
 
-    if (empty($betalingen)) {
-        return '<p>No payments have been registered yet.</p>';
+    $tabs = $wpdb->get_results($wpdb->prepare("
+        SELECT ts.id AS tab_id, ts.event_id, ts.timestamp, ts.is_paid, e.title
+        FROM tab_sales ts
+        LEFT JOIN wp_events e ON ts.event_id = e.uid
+        WHERE ts.uid = %s
+        ORDER BY ts.timestamp DESC
+    ", $uid));
+
+    $tab_ids = array_map(fn($tab) => $tab->tab_id, $tabs);
+    $tab_items = [];
+    if (!empty($tab_ids)) {
+        $query = "SELECT tab_id, item_name, quantity, price FROM tab_items WHERE tab_id IN (" . implode(',', array_fill(0, count($tab_ids), '%d')) . ")";
+        $prepared = $wpdb->prepare($query, ...$tab_ids);
+        foreach ($wpdb->get_results($prepared) as $item) {
+            $tab_items[$item->tab_id][] = $item;
+        }
+    }
+
+    $events = [];
+    foreach ($payments as $p) {
+        $eid = $p->event_id;
+        $events[$eid]['title'] = $p->title ?: "Unnamed Event (ID: $eid)";
+        $events[$eid]['payment'] = $p;
+    }
+    foreach ($tabs as $tab) {
+        $eid = $tab->event_id;
+        $events[$eid]['title'] = $tab->title ?: "Unnamed Event (ID: $eid)";
+        $events[$eid]['sales'][] = [
+            'tab' => $tab,
+            'items' => $tab_items[$tab->tab_id] ?? []
+        ];
     }
 
     ob_start();
-    echo '<div class="payment-list">';
-    echo '<table style="width: 100%; border-collapse: collapse;">';
-    echo '<thead><tr><th>Event</th><th>Datum</th><th>Bedrag</th><th>Status</th></tr></thead><tbody>';
+    echo '<style>
+        .event-card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #fff;
+        }
+        .event-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .event-payment {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        .status-paid { color: #2e7d32; font-weight: 600; }
+        .status-unpaid { color: #c62828; font-weight: 600; }
+        .toggle-btn {
+            display: inline-block;
+            margin-bottom: 10px;
+            padding: 6px 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            color: #0073aa;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .sales-content {
+            display: none;
+            background-color: #fafafa;
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .sales-table {
+            font-size: 14px;
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .sales-table th, .sales-table td {
+            font-size: 14px;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .sales-table th {
+            background-color: #f5f5f5;
+        }
+        .total-amount {
+            text-align: right;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+    </style>';
 
-    foreach ($betalingen as $betaling) {
-        $status = $betaling->entrance_paid ? '✅ Paid' : '❌ Not Paid';
-        $datum = $betaling->paid_at ? date('d/m/Y', strtotime($betaling->paid_at)) : '-';
-        $bedrag = number_format($betaling->entrance_fee, 2);
+    echo '<div class="event-overview">';
 
-        echo "<tr style='border-bottom: 1px solid #ccc;'>
-            <td>" . esc_html($betaling->title ?? 'Event not found') . "</td>
-            <td>$datum</td>
-            <td>€$bedrag</td>
-            <td>$status</td>
-        </tr>";
+    if (empty($events)) {
+        echo '<p>No events found for this user.</p>';
     }
 
-    echo '</tbody></table></div>';
+    $index = 0;
+    foreach ($events as $eid => $data) {
+        $title = esc_html($data['title']);
+        $indexId = 'event_' . $index++;
+
+        echo "<div class='event-card'>";
+        echo "<div class='event-title'>{$title}</div>";
+
+        if (!empty($data['payment'])) {
+            $p = $data['payment'];
+            $date = $p->paid_at ? date('d/m/Y', strtotime($p->paid_at)) : '-';
+            $fee = number_format($p->entrance_fee, 2);
+            $status = $p->entrance_paid ? "<span class='status-paid'>Paid</span>" : "<span class='status-unpaid'>Not Paid</span>";
+            echo "<div class='event-payment'>Payment: €{$fee} on {$date} – {$status}</div>";
+        }
+
+        if (!empty($data['sales'])) {
+            echo "<div class='toggle-btn' onclick=\"toggleSales('{$indexId}')\">Show purchases (" . count($data['sales']) . ")</div>";
+            echo "<div class='sales-content' id='{$indexId}'>";
+            foreach ($data['sales'] as $sale) {
+                $tab = $sale['tab'];
+                $datum = date('d/m/Y H:i', strtotime($tab->timestamp));
+                $tabStatus = $tab->is_paid ? "<span class='status-paid'>Paid</span>" : "<span class='status-unpaid'>Open</span>";
+                echo "<div><strong>Sale on:</strong> $datum – $tabStatus</div>";
+
+                if (!empty($sale['items'])) {
+                    $total = 0;
+                    echo "<table class='sales-table'><thead><tr><th>Item</th><th>Qty</th><th>Unit €</th><th>Total €</th></tr></thead><tbody>";
+                    foreach ($sale['items'] as $item) {
+                        $line = $item->quantity * $item->price;
+                        $total += $line;
+                        echo "<tr>
+                            <td>" . esc_html($item->item_name) . "</td>
+                            <td>$item->quantity</td>
+                            <td>" . number_format($item->price, 2) . "</td>
+                            <td>" . number_format($line, 2) . "</td>
+                        </tr>";
+                    }
+                    echo "</tbody></table>";
+                    echo "<div class='total-amount'>Total: €" . number_format($total, 2) . "</div>";
+                }
+            }
+            echo "</div>";
+        }
+
+        echo "</div>";
+    }
+
+    echo '</div>';
+
+    echo '<script>
+        function toggleSales(id) {
+            const el = document.getElementById(id);
+            el.style.display = (el.style.display === "none" || el.style.display === "") ? "block" : "none";
+        }
+    </script>';
 
     return ob_get_clean();
 }
-add_shortcode('mijn_betalingen', 'render_user_payments');
+add_shortcode('mijn_betalingen', 'render_clean_event_overview');
+
 
 
 function render_event_session_page() {
@@ -707,16 +837,8 @@ add_action('init', function () {
                     'details'  => $event->description,
                     'location' => $event->location
                 ]);
-
-                // Redirect de gebruiker naar zijn Google Calendar met het event ingevuld
-                echo '<div style="padding: 30px; font-family: sans-serif;">';
-                echo '<h2>✅ Je bent succesvol geregistreerd voor het event.</h2>';
-                echo '<p>Klik hieronder om dit event toe te voegen aan je Google Calendar:</p>';
-                echo '<a href="' . esc_url($calendar_url) . '" target="_blank" style="padding: 12px 20px; background-color: #0073aa; color: white; border-radius: 5px; text-decoration: none;">📅 Voeg toe aan Google Calendar</a>';
-                echo '<br><br><a href="' . esc_url(home_url('/')) . '">← Terug naar de homepage</a>';
-                echo '</div>';
+                wp_redirect(wp_get_referer());
                 exit;
-
 
             }
              else {
@@ -781,5 +903,516 @@ function activate_account_shortcode() {
     }
 }
 add_shortcode('activate_account', 'activate_account_shortcode');
+
+add_action('init', function () {
+    global $wpdb;
+
+    // Ophalen van laatst verwerkte user ID
+    $last_checked_id = (int) get_option('_auto_refresh_last_user_id', 0);
+
+    // Zoek users met hogere ID
+    $new_users = $wpdb->get_results($wpdb->prepare(
+        "SELECT ID FROM {$wpdb->users} WHERE ID > %d ORDER BY ID ASC LIMIT 5",
+        $last_checked_id
+    ));
+
+    if (empty($new_users)) {
+        return;
+    }
+
+    foreach ($new_users as $user) {
+        $result = wp_update_user(['ID' => $user->ID]);
+
+        if (!is_wp_error($result)) {
+            update_option('_auto_refresh_last_user_id', $user->ID);
+            error_log("[AutoRefreshNewUsers] Gebruiker {$user->ID} succesvol vernieuwd.");
+        } else {
+            error_log("[AutoRefreshNewUsers ERROR] Gebruiker {$user->ID} niet geüpdatet: " . $result->get_error_message());
+        }
+    }
+});
+
+function render_event_grid() {
+    global $wpdb;
+
+    // --- FILTERS ophalen uit $_GET ---
+    $search = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
+    $price_filter = isset($_GET['price_range']) ? $_GET['price_range'] : [];
+    $date_filter = isset($_GET['date_filter']) ? sanitize_text_field($_GET['date_filter']) : '';
+
+    // --- BASISQUERY ---
+    $query = "SELECT * FROM wp_events WHERE 1=1";
+    $params = [];
+
+    if ($search) {
+        $query .= " AND title LIKE %s";
+        $params[] = '%' . $wpdb->esc_like($search) . '%';
+    }
+
+    if (!empty($price_filter)) {
+        $price_conditions = [];
+        foreach ($price_filter as $range) {
+            if ($range === '5-10') {
+                $price_conditions[] = "(entrance_fee >= 5 AND entrance_fee <= 10)";
+            } elseif ($range === '10-15') {
+                $price_conditions[] = "(entrance_fee > 10 AND entrance_fee <= 15)";
+            } elseif ($range === '15-20') {
+                $price_conditions[] = "(entrance_fee > 15 AND entrance_fee <= 20)";
+            } elseif ($range === '20+') {
+                $price_conditions[] = "(entrance_fee > 20)";
+            }
+        }
+        if (!empty($price_conditions)) {
+            $query .= " AND (" . implode(" OR ", $price_conditions) . ")";
+        }
+    }
+
+    if ($date_filter === 'today') {
+        $query .= " AND start_date = CURDATE()";
+    } elseif ($date_filter === 'week') {
+        $query .= " AND start_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)";
+    } elseif ($date_filter === 'month') {
+        $query .= " AND start_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 1 MONTH)";
+    }
+
+    $query .= " ORDER BY start_date ASC";
+    $events = $params ? $wpdb->get_results($wpdb->prepare($query, ...$params)) : $wpdb->get_results($query);
+
+    ob_start();
+    ?>
+        <style>
+        /* 1. Overall Container Layout */
+        .event-grid-container {
+            display: flex;
+            flex-wrap: wrap;
+            width: 100%;
+            padding: 32px 48px; /* Add left/right breathing room */
+            box-sizing: border-box;
+            padding: 0px;
+            gap: 32px;
+        }
+
+        /* 2. Sidebar (filters) */
+        .event-sidebar {
+            flex: 0 0 260px;
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            position: sticky;
+            top: 20px;
+            align-self: flex-start;
+            box-sizing: border-box;
+        }
+
+        .filter-block {
+            margin-bottom: 28px;
+            padding-right: 5px;
+        }
+
+        .filter-block h4 {
+            font-size: 15px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4px;
+        }
+
+        .filter-block label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+
+        .event-sidebar input[type="text"] {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            max-width: 100%;
+            padding: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+
+        /* 3. Main area */
+        .event-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .event-main h2 {
+            font-size: 22px;
+            margin-bottom: 16px;
+        }
+
+        /* 4. Grid of event cards */
+        .event-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+        }
+
+        /* 5. Event card */
+        .event-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 16px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .event-card:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .event-card h3 {
+            font-size: 17px;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+
+        .event-card .meta {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .event-card .price {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .card-footer {
+            margin-top: auto;
+            padding-top: 12px;
+        }
+
+        .event-card .button {
+            display: inline-block;
+            padding: 8px 12px;
+            background-color: #0073aa;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .event-card .button:hover {
+            background-color: #005a8c;
+        }
+
+        /* 6. Mobile responsive */
+        @media (max-width: 768px) {
+            .event-grid-container {
+                flex-direction: column;
+                padding: 16px;
+            }
+
+            .event-sidebar {
+                width: 100%;
+                position: static;
+                margin-bottom: 20px;
+            }
+        }
+        </style>
+
+
+
+    <form method="get">
+    <div class="event-grid-container">
+        <div class="event-sidebar">
+            <div class="filter-block">
+                <h4>Zoek een event</h4>
+                <input type="text" name="search" placeholder="Titel..." value="<?php echo esc_attr($search); ?>" onchange="this.form.submit()">
+            </div>
+            <div class="filter-block">
+                <h4>Prijsrange</h4>
+                <?php
+                $ranges = [ '5-10' => '€5–€10', '10-15' => '€10–€15', '15-20' => '€15–€20', '20+' => '€20+' ];
+                foreach ($ranges as $key => $label) {
+                    $checked = in_array($key, (array)$price_filter) ? 'checked' : '';
+                    echo "<label><input type='checkbox' name='price_range[]' value='$key' $checked onchange='this.form.submit()'> $label</label>";
+                }
+                ?>
+            </div>
+            <div class="filter-block">
+                <h4>Datum</h4>
+                <?php
+                $date_options = [
+                    '' => 'Alle',
+                    'today' => 'Vandaag',
+                    'week' => 'Deze week',
+                    'month' => 'Deze maand'
+                ];
+                foreach ($date_options as $key => $label) {
+                    $checked = ($date_filter === $key) ? 'checked' : '';
+                    echo "<label><input type='radio' name='date_filter' value='$key' $checked onchange='this.form.submit()'> $label</label>";
+                }
+                ?>
+            </div>
+        </div>
+
+        <div class="event-main">
+            <div class="event-grid">
+            <?php
+            if (empty($events)) {
+                echo '<p>Geen evenementen gevonden.</p>';
+            } else {
+                foreach ($events as $event) {
+                    $title = esc_html($event->title);
+                    $location = esc_html($event->location);
+                    $start = esc_html($event->start_date);
+                    $end = esc_html($event->end_date);
+                    $price = number_format($event->entrance_fee, 2);
+                    $link = '/event-detail?uid=' . esc_attr($event->uid);
+
+                    echo "<div class='event-card'>";
+                    echo "<h3>$title</h3>";
+                    echo "<div class='meta'>$start tot $end</div>";
+                    echo "<div class='meta'>$location</div>";
+                    echo "<div class='price'>€$price</div>";
+                    echo "<div class='card-footer'><a href='$link' class='button'>Meer info</a></div>";
+                    echo "</div>";
+                }
+            }
+            ?>
+            </div>
+        </div>
+    </div>
+    </form>
+    <?php
+    return ob_get_clean();
+}
+add_shortcode('event_grid', 'render_event_grid');
+
+function render_event_detail_viewer() {
+    if (!isset($_GET['uid'])) return '<p>Geen event geselecteerd.</p>';
+
+    global $wpdb;
+    $uid = sanitize_text_field($_GET['uid']);
+    $event = $wpdb->get_row($wpdb->prepare("SELECT * FROM wp_events WHERE uid = %s", $uid));
+    if (!$event) return '<p>Event niet gevonden.</p>';
+
+    $is_logged_in = is_user_logged_in();
+    $user_id = $is_logged_in ? get_current_user_id() : null;
+    $user_uid = $is_logged_in ? get_user_meta($user_id, 'uid', true) : null;
+    $is_registered = $is_logged_in ? $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM user_event WHERE user_id = %s AND event_id = %s",
+        $user_uid,
+        $uid
+    )) : false;
+
+    ob_start();
+    ?>
+
+    <style>
+    .event-detail-container {
+        width: 100%;
+        margin: 40px auto;
+        padding: 24px;
+        background: #fff;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        font-family: system-ui, sans-serif;
+    }
+    .event-detail-container h2 {
+        margin-top: 0;
+    }
+    .event-detail-container p {
+        margin: 8px 0;
+    }
+    .event-meta p {
+        margin: 4px 0;
+        font-size: 15px;
+    }
+    .button {
+        display: inline-block;
+        margin: 10px 10px 0 0;
+        padding: 8px 12px;
+        background: #0073aa;
+        color: white;
+        border-radius: 4px;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .button:hover {
+        background: #005a8c;
+    }
+    .button.red {
+        background: #d63638;
+    }
+    .button.red:hover {
+        background: #a90002;
+    }
+    .session-block {
+        background: #f9f9f9;
+        padding: 16px;
+        margin-top: 20px;
+        border-left: 4px solid #0073aa;
+        border-radius: 4px;
+    }
+    .back-link {
+        margin-bottom: 16px;
+        display: inline-block;
+        font-size: 14px;
+        text-decoration: none;
+        color: #0073aa;
+    }
+    .back-link:hover {
+        text-decoration: underline;
+    }
+    </style>
+
+    <div class="event-detail-container">
+        <a href="<?php echo esc_url(wp_get_referer())  ?>" class="back-link">← Terug naar eventlijst</a>
+
+        <h2><?php echo esc_html($event->title); ?></h2>
+
+        <div class="event-meta">
+            <p><strong>Datum:</strong> <?php echo esc_html($event->start_date); ?> tot <?php echo esc_html($event->end_date); ?></p>
+            <p><strong>Locatie:</strong> <?php echo esc_html($event->location); ?></p>
+            <p><strong>Toegang:</strong> €<?php echo number_format($event->entrance_fee, 2); ?></p>
+        </div>
+
+        <p><?php echo esc_html($event->description); ?></p>
+
+        <?php if ($is_logged_in): ?>
+            <?php if ($is_registered): ?>
+                <p>Je bent al geregistreerd voor dit event.</p>
+                <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                    'text' => $event->title,
+                    'dates' => date('Ymd\THis\Z', strtotime($event->start_date)) . '/' . date('Ymd\THis\Z', strtotime($event->end_date)),
+                    'details' => $event->description,
+                    'location' => $event->location
+                ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
+
+                <form method="POST" action="/unregisterevent">
+                    <input type="hidden" name="event_uid" value="<?php echo esc_attr($uid); ?>">
+                    <button type="submit" class="button red">Annuleer registratie</button>
+                </form>
+            <?php else: ?>
+                <form method="POST" action="/registerevent">
+                    <input type="hidden" name="event_uid" value="<?php echo esc_attr($uid); ?>">
+                    <button type="submit" class="button">Registreer voor event</button>
+                </form>
+            <?php endif; ?>
+        <?php else: ?>
+            <p><em>Log in om je te registreren.</em></p>
+        <?php endif; ?>
+
+        <h3>Sessies</h3>
+
+        <?php
+        $sessions = $wpdb->get_results($wpdb->prepare("SELECT * FROM wp_sessions WHERE event_uid = %s ORDER BY date ASC", $uid));
+        foreach ($sessions as $session):
+            $is_session_registered = $is_logged_in ? $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM user_session WHERE user_id = %s AND session_id = %s",
+                $user_uid,
+                $session->uid
+            )) : false;
+
+            $session_count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM user_session WHERE session_id = %s", $session->uid));
+        ?>
+            <div class="session-block">
+                <strong><?php echo esc_html($session->title); ?></strong>
+                <p><strong>Datum:</strong> <?php echo esc_html($session->date); ?> <?php echo esc_html($session->start_time); ?>–<?php echo esc_html($session->end_time); ?></p>
+                <p><strong>Locatie:</strong> <?php echo esc_html($session->location); ?></p>
+                <p><strong>Spreker:</strong> <?php echo esc_html($session->speaker_name); ?></p>
+                <p><em><?php echo esc_html($session->speaker_bio); ?></em></p>
+                <p><?php echo esc_html($session->description); ?></p>
+                <p><strong>Aantal deelnemers:</strong> <?php echo esc_html($session_count); ?> / <?php echo esc_html($session->max_attendees); ?></p>
+
+                <?php if (!$is_logged_in): ?>
+                    <p><em>Log in om je te registreren voor sessies.</em></p>
+                <?php elseif (!$is_registered): ?>
+                    <p><em>Registreer eerst voor het event om sessies te kunnen bijwonen.</em></p>
+                <?php elseif ($is_session_registered): ?>
+                    <form method="POST" action="/unregisterevent">
+                        <input type="hidden" name="session_uid" value="<?php echo esc_attr($session->uid); ?>">
+                        <button type="submit" class="button red">Annuleer registratie</button>
+                    </form>
+                    <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                        'text' => $session->title,
+                        'dates' => date('Ymd\THis\Z', strtotime($session->date . ' ' . $session->start_time)) . '/' . date('Ymd\THis\Z', strtotime($session->date . ' ' . $session->end_time)),
+                        'details' => $session->description,
+                        'location' => $session->location
+                    ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
+                <?php else: ?>
+                    <form method="POST" action="/registerevent">
+                        <input type="hidden" name="session_uid" value="<?php echo esc_attr($session->uid); ?>">
+                        <button type="submit" class="button">Registreer voor sessie</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
+
+    <?php
+    return ob_get_clean();
+}
+add_shortcode('event_detail_viewer', 'render_event_detail_viewer');
+
+add_action('after_setup_theme', function () {
+    remove_theme_support('core-block-patterns');
+});
+
+function render_attendify_homepage() {
+    ob_start();
+    ?>
+    <style>
+        .homepage-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end; /* descend le contenu */
+            background: url('<?php echo get_stylesheet_directory_uri(); ?>/backdrop.png') no-repeat center top;
+            background-size: 100% auto;
+            width: 100%;
+            min-height: 120vh;
+            padding-bottom: 80px; /* espace depuis le bas */
+            box-sizing: border-box;
+        }
+
+        .homepage-wrapper a.button {
+            background-color: #0073aa;
+            color: white;
+            padding: 16px 48px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 35px;
+        }
+
+        .homepage-wrapper a.button:hover {
+            background-color: #005a8c;
+        }
+        .thisone {
+            background-color: #0073aa;
+            color: white;
+            padding: 16px 150px;
+            text-decoration: none;
+            border-radius: 46px;
+            font-size: 25px;
+            font-weight: 900;
+        }
+    </style>
+
+    <div class="homepage-wrapper">
+        <a href="/events-en-sessie-lijst" class="thisone">All events</a>
+
+    </div>
+    <?php
+    return ob_get_clean();
+}
+add_shortcode('homepage', 'render_attendify_homepage');
+
 
 add_action('init', 'twentytwentyfive_register_block_bindings');
