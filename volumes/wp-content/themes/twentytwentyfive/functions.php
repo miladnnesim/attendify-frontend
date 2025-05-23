@@ -1406,7 +1406,7 @@ function render_attendify_homepage() {
     </style>
 
     <div class="homepage-wrapper">
-        <a href="/events-en-sessie-lijst" class="thisone">All events</a>
+        <a href="/event-en-session" class="thisone">All events</a>
 
     </div>
     <?php
