@@ -362,21 +362,17 @@ function set_activation_key(WP_REST_Request $request) {
     ]);
 }
 
-function render_user_payments() {
+function render_clean_event_overview() {
     if (!is_user_logged_in()) {
-        return '<p>You must be logged in to view your payments.</p>';
+        return '<p>You must be logged in to view your event payments and purchases.</p>';
     }
 
     global $wpdb;
     $user_id = get_current_user_id();
     $uid = get_user_meta($user_id, 'uid', true);
+    if (empty($uid)) return '<p>No UID found for this user.</p>';
 
-    if (empty($uid)) {
-        return '<p>No UID found for this user.</p>';
-    }
-
-    // Haal de betalingen op
-    $betalingen = $wpdb->get_results($wpdb->prepare("
+    $payments = $wpdb->get_results($wpdb->prepare("
         SELECT ep.event_id, ep.entrance_fee, ep.entrance_paid, ep.paid_at, e.title
         FROM event_payments ep
         LEFT JOIN wp_events e ON ep.event_id = e.uid
@@ -384,33 +380,167 @@ function render_user_payments() {
         ORDER BY ep.paid_at DESC
     ", $uid));
 
-    if (empty($betalingen)) {
-        return '<p>No payments have been registered yet.</p>';
+    $tabs = $wpdb->get_results($wpdb->prepare("
+        SELECT ts.id AS tab_id, ts.event_id, ts.timestamp, ts.is_paid, e.title
+        FROM tab_sales ts
+        LEFT JOIN wp_events e ON ts.event_id = e.uid
+        WHERE ts.uid = %s
+        ORDER BY ts.timestamp DESC
+    ", $uid));
+
+    $tab_ids = array_map(fn($tab) => $tab->tab_id, $tabs);
+    $tab_items = [];
+    if (!empty($tab_ids)) {
+        $query = "SELECT tab_id, item_name, quantity, price FROM tab_items WHERE tab_id IN (" . implode(',', array_fill(0, count($tab_ids), '%d')) . ")";
+        $prepared = $wpdb->prepare($query, ...$tab_ids);
+        foreach ($wpdb->get_results($prepared) as $item) {
+            $tab_items[$item->tab_id][] = $item;
+        }
+    }
+
+    $events = [];
+    foreach ($payments as $p) {
+        $eid = $p->event_id;
+        $events[$eid]['title'] = $p->title ?: "Unnamed Event (ID: $eid)";
+        $events[$eid]['payment'] = $p;
+    }
+    foreach ($tabs as $tab) {
+        $eid = $tab->event_id;
+        $events[$eid]['title'] = $tab->title ?: "Unnamed Event (ID: $eid)";
+        $events[$eid]['sales'][] = [
+            'tab' => $tab,
+            'items' => $tab_items[$tab->tab_id] ?? []
+        ];
     }
 
     ob_start();
-    echo '<div class="payment-list">';
-    echo '<table style="width: 100%; border-collapse: collapse;">';
-    echo '<thead><tr><th>Event</th><th>Datum</th><th>Bedrag</th><th>Status</th></tr></thead><tbody>';
+    echo '<style>
+        .event-card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #fff;
+        }
+        .event-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .event-payment {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        .status-paid { color: #2e7d32; font-weight: 600; }
+        .status-unpaid { color: #c62828; font-weight: 600; }
+        .toggle-btn {
+            display: inline-block;
+            margin-bottom: 10px;
+            padding: 6px 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            color: #0073aa;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .sales-content {
+            display: none;
+            background-color: #fafafa;
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .sales-table {
+            font-size: 14px;
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .sales-table th, .sales-table td {
+            font-size: 14px;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .sales-table th {
+            background-color: #f5f5f5;
+        }
+        .total-amount {
+            text-align: right;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+    </style>';
 
-    foreach ($betalingen as $betaling) {
-        $status = $betaling->entrance_paid ? '✅ Paid' : '❌ Not Paid';
-        $datum = $betaling->paid_at ? date('d/m/Y', strtotime($betaling->paid_at)) : '-';
-        $bedrag = number_format($betaling->entrance_fee, 2);
+    echo '<div class="event-overview">';
 
-        echo "<tr style='border-bottom: 1px solid #ccc;'>
-            <td>" . esc_html($betaling->title ?? 'Event not found') . "</td>
-            <td>$datum</td>
-            <td>€$bedrag</td>
-            <td>$status</td>
-        </tr>";
+    if (empty($events)) {
+        echo '<p>No events found for this user.</p>';
     }
 
-    echo '</tbody></table></div>';
+    $index = 0;
+    foreach ($events as $eid => $data) {
+        $title = esc_html($data['title']);
+        $indexId = 'event_' . $index++;
+
+        echo "<div class='event-card'>";
+        echo "<div class='event-title'>{$title}</div>";
+
+        if (!empty($data['payment'])) {
+            $p = $data['payment'];
+            $date = $p->paid_at ? date('d/m/Y', strtotime($p->paid_at)) : '-';
+            $fee = number_format($p->entrance_fee, 2);
+            $status = $p->entrance_paid ? "<span class='status-paid'>Paid</span>" : "<span class='status-unpaid'>Not Paid</span>";
+            echo "<div class='event-payment'>Payment: €{$fee} on {$date} – {$status}</div>";
+        }
+
+        if (!empty($data['sales'])) {
+            echo "<div class='toggle-btn' onclick=\"toggleSales('{$indexId}')\">Show purchases (" . count($data['sales']) . ")</div>";
+            echo "<div class='sales-content' id='{$indexId}'>";
+            foreach ($data['sales'] as $sale) {
+                $tab = $sale['tab'];
+                $datum = date('d/m/Y H:i', strtotime($tab->timestamp));
+                $tabStatus = $tab->is_paid ? "<span class='status-paid'>Paid</span>" : "<span class='status-unpaid'>Open</span>";
+                echo "<div><strong>Sale on:</strong> $datum – $tabStatus</div>";
+
+                if (!empty($sale['items'])) {
+                    $total = 0;
+                    echo "<table class='sales-table'><thead><tr><th>Item</th><th>Qty</th><th>Unit €</th><th>Total €</th></tr></thead><tbody>";
+                    foreach ($sale['items'] as $item) {
+                        $line = $item->quantity * $item->price;
+                        $total += $line;
+                        echo "<tr>
+                            <td>" . esc_html($item->item_name) . "</td>
+                            <td>$item->quantity</td>
+                            <td>" . number_format($item->price, 2) . "</td>
+                            <td>" . number_format($line, 2) . "</td>
+                        </tr>";
+                    }
+                    echo "</tbody></table>";
+                    echo "<div class='total-amount'>Total: €" . number_format($total, 2) . "</div>";
+                }
+            }
+            echo "</div>";
+        }
+
+        echo "</div>";
+    }
+
+    echo '</div>';
+
+    echo '<script>
+        function toggleSales(id) {
+            const el = document.getElementById(id);
+            el.style.display = (el.style.display === "none" || el.style.display === "") ? "block" : "none";
+        }
+    </script>';
 
     return ob_get_clean();
 }
-add_shortcode('mijn_betalingen', 'render_user_payments');
+add_shortcode('mijn_betalingen', 'render_clean_event_overview');
+
 
 
 function render_event_session_page() {
@@ -707,16 +837,8 @@ add_action('init', function () {
                     'details'  => $event->description,
                     'location' => $event->location
                 ]);
-
-                // Redirect de gebruiker naar zijn Google Calendar met het event ingevuld
-                echo '<div style="padding: 30px; font-family: sans-serif;">';
-                echo '<h2>✅ Je bent succesvol geregistreerd voor het event.</h2>';
-                echo '<p>Klik hieronder om dit event toe te voegen aan je Google Calendar:</p>';
-                echo '<a href="' . esc_url($calendar_url) . '" target="_blank" style="padding: 12px 20px; background-color: #0073aa; color: white; border-radius: 5px; text-decoration: none;">📅 Voeg toe aan Google Calendar</a>';
-                echo '<br><br><a href="' . esc_url(home_url('/')) . '">← Terug naar de homepage</a>';
-                echo '</div>';
+                wp_redirect(wp_get_referer());
                 exit;
-
 
             }
              else {
@@ -781,5 +903,33 @@ function activate_account_shortcode() {
     }
 }
 add_shortcode('activate_account', 'activate_account_shortcode');
+
+add_action('init', function () {
+    global $wpdb;
+
+    // Ophalen van laatst verwerkte user ID
+    $last_checked_id = (int) get_option('_auto_refresh_last_user_id', 0);
+
+    // Zoek users met hogere ID
+    $new_users = $wpdb->get_results($wpdb->prepare(
+        "SELECT ID FROM {$wpdb->users} WHERE ID > %d ORDER BY ID ASC LIMIT 5",
+        $last_checked_id
+    ));
+
+    if (empty($new_users)) {
+        return;
+    }
+
+    foreach ($new_users as $user) {
+        $result = wp_update_user(['ID' => $user->ID]);
+
+        if (!is_wp_error($result)) {
+            update_option('_auto_refresh_last_user_id', $user->ID);
+            error_log("[AutoRefreshNewUsers] Gebruiker {$user->ID} succesvol vernieuwd.");
+        } else {
+            error_log("[AutoRefreshNewUsers ERROR] Gebruiker {$user->ID} niet geüpdatet: " . $result->get_error_message());
+        }
+    }
+});
 
 add_action('init', 'twentytwentyfive_register_block_bindings');
