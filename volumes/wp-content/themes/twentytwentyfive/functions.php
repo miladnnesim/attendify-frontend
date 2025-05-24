@@ -184,8 +184,8 @@ add_action('um_before_account_page_load', function () {
 add_filter('um_account_content_hook_extra_info', 'um_account_content_hook_extra_info', 10, 2);
 
 function um_account_content_hook_extra_info($output, $tab_id) {
-    UM()->user()->reset();
-	UM()->user()->set(get_current_user_id(), true);
+    	
+
     // Haal het ID van het "Default Registration" formulier op
     $register_form_id = 6; // Pas dit aan als het ID van jouw registratieformulier anders is
 
@@ -203,7 +203,7 @@ function um_account_content_hook_extra_info($output, $tab_id) {
 
     // Haal de huidige gebruiker op
     $user_id = get_current_user_id();
-
+    do_action('profile_update', $user_id, get_userdata($user_id));
     // Loop door de velden en bereid ze voor om te renderen
     foreach ($form_fields as $key => $field) {
         if (isset($field['editable']) && $field['editable'] == 1) {
