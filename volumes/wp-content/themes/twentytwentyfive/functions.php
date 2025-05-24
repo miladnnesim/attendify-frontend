@@ -1365,8 +1365,14 @@ function render_event_detail_viewer() {
         <h2><?php echo esc_html($event->title); ?></h2>
 
         <div class="event-meta">
-            <p><strong>Datum:</strong> <?php echo esc_html($event->start_date); ?> tot <?php echo esc_html($event->end_date); ?></p>
-            <p><strong>Locatie:</strong> <?php echo esc_html($event->location); ?></p>
+<p><strong>Datum & Tijd:</strong>
+  <?php
+    echo esc_html( date_i18n( 'd/m/Y H:i', strtotime("$event->start_date {$event->start_time}") ) );
+    echo ' – ';
+    echo esc_html( date_i18n( 'd/m/Y H:i', strtotime("$event->end_date {$event->end_time}") ) );
+  ?>
+</p>            <p><strong>Locatie:</strong> <?php echo esc_html($event->location); ?></p>
+            
             <p><strong>Toegang:</strong> €<?php echo number_format($event->entrance_fee, 2); ?></p>
         </div>
 
@@ -1377,8 +1383,10 @@ function render_event_detail_viewer() {
                 <p>Je bent al geregistreerd voor dit event.</p>
                 <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
                     'text' => $event->title,
-                    'dates' => date('Ymd\THis\Z', strtotime($event->start_date)) . '/' . date('Ymd\THis\Z', strtotime($event->end_date)),
-                    'details' => $event->description,
+'dates'   =>
+          date( 'Ymd\THis\Z', strtotime("$event->start_date {$event->start_time}") )
+          . '/'
+          . date( 'Ymd\THis\Z', strtotime("$event->end_date {$event->end_time}") ),                    'details' => $event->description,
                     'location' => $event->location
                 ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
 
