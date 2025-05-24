@@ -10,7 +10,7 @@ require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/producercompany.php'
 
 function company_register_form_shortcode() {
     if (!is_user_logged_in()) {
-        return '<div class="alert alert-error">Vous devez être connecté pour enregistrer une entreprise.</div>';
+        return '<div class="alert alert-error">You must be logged in to register a company</div>';
     }
 
     ob_start();
@@ -268,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if ($success) {
             $producer = new CompanyProducer();
             $producer->sendCompanyData($company_data, 'create');
-            echo '<div class="alert alert-success">La société a été enregistrée avec succès.</div>';
+            echo '<div class="alert alert-success">The company has been registered successfully.</div>';
         }
     }
 
