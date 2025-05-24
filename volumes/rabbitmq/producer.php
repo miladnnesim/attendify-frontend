@@ -177,7 +177,6 @@ class Producer {
         $this->channel->basic_publish($msg, $this->exchange, $routing_key);
 
         set_transient($transient_key, $hash, 5);
-        echo "[x] Sent XML message with routing key '$routing_key'\n";
     }
 
     public function __destruct() {
