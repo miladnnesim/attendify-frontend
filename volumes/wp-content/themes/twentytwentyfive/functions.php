@@ -871,15 +871,100 @@ function activate_account_shortcode() {
         $login = sanitize_text_field($_GET['login']);
 
         ob_start();
-        echo '<h2>Kies een nieuw wachtwoord voor ' . esc_html($login) . '</h2>';
-        echo '<form method="post">';
-        echo '<input type="hidden" name="rp_key" value="' . esc_attr($key) . '">';
-        echo '<input type="hidden" name="rp_login" value="' . esc_attr($login) . '">';
-        echo '<p><input type="password" name="new_pass" placeholder="Nieuw wachtwoord" required></p>';
-        echo '<p><input type="password" name="new_pass_repeat" placeholder="Herhaal wachtwoord" required></p>';
-        echo '<p><button type="submit" name="set_password">Wachtwoord instellen</button></p>';
-        echo '</form>';
+        ?>
 
+        <style>
+        .crf-form {
+            max-width: 700px;
+            margin: 0 auto;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 15px;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-weight: 500;
+        }
+        .form-control {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.55rem 0.8rem;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+            background-color: #fafafa;
+            transition: border 0.2s ease-in-out, background 0.2s;
+        }
+        .form-control:focus {
+            border-color: #888;
+            background-color: #fff;
+            outline: none;
+        }
+        .btn {
+            padding: 0.6rem 1.2rem;
+            font-size: 14px;
+            border: 1px solid #bbb;
+            border-radius: 6px;
+            cursor: pointer;
+            background-color: #f4f4f4;
+            color: #333;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #e8e8e8;
+            border-color: #999;
+        }
+        .btn-primary {
+            background-color: #f0f0f0;
+            border-color: #ccc;
+            color: #333;
+        }
+        .btn-primary:hover {
+            background-color: #e0e0e0;
+            border-color: #999;
+            color: #000;
+        }
+        .alert-success {
+            background-color: #e6f4ea;
+            color: #276738;
+            border: 1px solid #cde7d7;
+            padding: 0.8rem 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+        }
+        .alert-error {
+            background-color: #fbeaea;
+            color: #7a1c1c;
+            border: 1px solid #f5cccc;
+            padding: 0.8rem 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+        }
+        </style>
+
+        <div class="crf-form">
+            <h2>Choose a new password for <strong><?php echo esc_html($login); ?></strong></h2>
+            <form method="post">
+                <input type="hidden" name="rp_key" value="<?php echo esc_attr($key); ?>">
+                <input type="hidden" name="rp_login" value="<?php echo esc_attr($login); ?>">
+
+                <div class="form-group">
+                    <label class="form-label" for="new_pass">New password</label>
+                    <input class="form-control" type="password" name="new_pass" id="new_pass" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="new_pass_repeat">Repeat password</label>
+                    <input class="form-control" type="password" name="new_pass_repeat" id="new_pass_repeat" required>
+                </div>
+                <button type="submit" name="set_password" class="btn btn-primary">Set Password</button>
+            </form>
+
+        <?php
         if (isset($_POST['set_password'])) {
             $user = check_password_reset_key($key, $login);
             if (!is_wp_error($user)) {
@@ -888,21 +973,23 @@ function activate_account_shortcode() {
 
                 if ($new_pass === $repeat) {
                     reset_password($user, $new_pass);
-                    echo '<p>✅ Wachtwoord ingesteld. <a href="' . wp_login_url() . '">Inloggen</a></p>';
+                    echo '<div class="alert-success">Password successfully set. <a href="' . wp_login_url() . '">Log in</a></div>';
                 } else {
-                    echo '<p style="color:red;">❌ Wachtwoorden komen niet overeen.</p>';
+                    echo '<div class="alert-error">Passwords do not match.</div>';
                 }
             } else {
-                echo '<p style="color:red;">❌ Ongeldige of verlopen link.</p>';
+                echo '<div class="alert-error">Invalid or expired activation link.</div>';
             }
         }
+        echo '</div>'; // .crf-form
 
         return ob_get_clean();
     } else {
-        return '<p>❌ Geen activatiegegevens gevonden in de URL.</p>';
+        return '<div class="alert-error">No activation information found in the URL.</div>';
     }
 }
 add_shortcode('activate_account', 'activate_account_shortcode');
+
 
 add_action('init', function () {
     global $wpdb;
