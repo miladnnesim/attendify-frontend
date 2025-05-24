@@ -1509,5 +1509,14 @@ function render_attendify_homepage() {
 }
 add_shortcode('homepage', 'render_attendify_homepage');
 
+add_filter('um_predefined_fields_hook', 'force_refresh_company_field');
+
+function force_refresh_company_field($fields) {
+    if (isset($fields['company_vat_number'])) {
+        $fields['company_vat_number']['dynamic'] = true;
+    }
+    return $fields;
+}
+
 
 add_action('init', 'twentytwentyfive_register_block_bindings');
