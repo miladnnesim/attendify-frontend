@@ -170,10 +170,22 @@ function add_extra_info_tab($tabs) {
     );
     return $tabs;
 }
+add_action('um_before_account_page_load', function () {
+	static $once = false;
+	if ($once || !is_user_logged_in()) return;
+
+	$once = true;
+	UM()->user()->reset();
+	UM()->user()->set(get_current_user_id(), true);
+});
+
 
 // Voeg inhoud toe aan de nieuwe tab
 add_filter('um_account_content_hook_extra_info', 'um_account_content_hook_extra_info', 10, 2);
+
 function um_account_content_hook_extra_info($output, $tab_id) {
+    UM()->user()->reset();
+	UM()->user()->set(get_current_user_id(), true);
     // Haal het ID van het "Default Registration" formulier op
     $register_form_id = 6; // Pas dit aan als het ID van jouw registratieformulier anders is
 
@@ -1509,14 +1521,6 @@ function render_attendify_homepage() {
 }
 add_shortcode('homepage', 'render_attendify_homepage');
 
-add_filter('um_predefined_fields_hook', 'force_refresh_company_field');
-
-function force_refresh_company_field($fields) {
-    if (isset($fields['company_vat_number'])) {
-        $fields['company_vat_number']['dynamic'] = true;
-    }
-    return $fields;
-}
 
 
 add_action('init', 'twentytwentyfive_register_block_bindings');
