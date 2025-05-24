@@ -10,129 +10,231 @@ require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/producercompany.php'
 
 function company_register_form_shortcode() {
     if (!is_user_logged_in()) {
-        return '<p style="color:red;">❌ You must be logged in to register a company.</p>';
+        return '<div class="alert alert-error">Vous devez être connecté pour enregistrer une entreprise.</div>';
     }
 
     ob_start();
     ?>
-<form action="" method="POST">
-    <!-- Company Information -->
-    <label for="company_name">Name of the company:</label>
-    <input type="text" name="company_name" required><br>
+<style>
+.crf-form {
+    max-width: 700px;
+    margin: 0 auto;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 15px;
+    color: #333;
+}
+.form-group {
+    margin-bottom: 1.2rem;
+}
+.form-label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 500;
+}
+.form-control {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.55rem 0.8rem;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    background-color: #fafafa;
+    transition: border 0.2s ease-in-out, background 0.2s;
+}
+.form-control:focus {
+    border-color: #888;
+    background-color: #fff;
+    outline: none;
+}
+fieldset {
+    border: 1px solid #ddd;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+}
+legend {
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 0 0.5rem;
+}
+input[type="radio"] {
+    margin-right: 6px;
+}
+.btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 14px;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    cursor: pointer;
+    background-color: #f4f4f4;
+    color: #333;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+.btn:hover {
+    background-color: #e8e8e8;
+    border-color: #999;
+}
+.btn-primary {
+    background-color: #f0f0f0;
+    border-color: #ccc;
+    color: #333;
+}
+.btn-primary:hover {
+    background-color: #e0e0e0;
+    border-color: #999;
+    color: #000;
+}
+.alert {
+    padding: 0.8rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+}
+.alert-success {
+    background-color: #e6f4ea;
+    color: #276738;
+    border: 1px solid #cde7d7;
+}
+.alert-error {
+    background-color: #fbeaea;
+    color: #7a1c1c;
+    border: 1px solid #f5cccc;
+}
+.billing-fields.hidden {
+    display: none;
+}
+</style>
 
-    <label for="business_number">Business Number:</label>
-    <input type="text" name="business_number" required><br>
+<form class="crf-form" action="" method="POST" novalidate>
+    <div class="form-group">
+        <label class="form-label" for="company_name">Company Name</label>
+        <input class="form-control" type="text" name="company_name" id="company_name" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label" for="business_number">Business Number</label>
+        <input class="form-control" type="text" name="business_number" id="business_number" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label" for="vat_number">VAT Number</label>
+        <input class="form-control" type="text" name="vat_number" id="vat_number" required>
+    </div>
 
-    <label for="vat_number">VAT Number:</label>
-    <input type="text" name="vat_number" required><br>
+    <fieldset class="form-group">
+        <legend class="form-label">Company Address</legend>
+        <div class="form-group">
+            <label class="form-label" for="company_address">Street</label>
+            <input class="form-control" type="text" name="company_address" id="company_address" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="street_number">Number</label>
+            <input class="form-control" type="text" name="street_number" id="street_number" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="postal_code">Postal Code</label>
+            <input class="form-control" type="text" name="postal_code" id="postal_code" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="city">City</label>
+            <input class="form-control" type="text" name="city" id="city" required>
+        </div>
+    </fieldset>
 
-    <!-- Company Address -->
-    <label for="company_address">Street:</label>
-    <input type="text" name="company_address" id="company_address" required><br>
+    <fieldset class="form-group">
+        <legend class="form-label">Billing Address</legend>
+        <label><input type="radio" name="billing_option" value="same" id="billing_same"> Same as company address</label>
+        <label><input type="radio" name="billing_option" value="custom" id="billing_custom" checked> Different address</label>
+    </fieldset>
 
-    <label for="street_number">Number:</label>
-    <input type="text" name="street_number" id="street_number" required><br>
+    <div class="billing-fields">
+        <div class="form-group">
+            <label class="form-label" for="billing_address">Billing street</label>
+            <input class="form-control" type="text" name="billing_address" id="billing_address" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="billing_street_number">Billing number</label>
+            <input class="form-control" type="text" name="billing_street_number" id="billing_street_number" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="billing_postal_code">Billing postal Code</label>
+            <input class="form-control" type="text" name="billing_postal_code" id="billing_postal_code" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="billing_city">Billing city</label>
+            <input class="form-control" type="text" name="billing_city" id="billing_city" required>
+        </div>
+    </div>
 
-    <label for="postal_code">Postal Code:</label>
-    <input type="text" name="postal_code" id="postal_code" required><br>
+    <div class="form-group">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-control" type="email" name="email" id="email" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label" for="phone">Phone</label>
+        <input class="form-control" type="text" name="phone" id="phone" required>
+    </div>
 
-    <label for="city">City:</label>
-    <input type="text" name="city" id="city" required><br>
-
-    <!-- Billing Address Options -->
-    <label><strong>Billing address:</strong></label><br>
-    <input type="radio" name="billing_option" value="same" id="billing_same">
-    <label for="billing_same">Billing address is the same as company address</label><br>
-
-    <input type="radio" name="billing_option" value="custom" id="billing_custom" checked>
-    <label for="billing_custom">I want to fill in a different billing address</label><br><br>
-
-    <!-- Billing Address Fields -->
-    <label for="billing_address">Billing Street:</label>
-    <input type="text" name="billing_address" id="billing_address" required><br>
-
-    <label for="billing_street_number">Billing Number:</label>
-    <input type="text" name="billing_street_number" id="billing_street_number" required><br>
-
-    <label for="billing_postal_code">Billing Postal Code:</label>
-    <input type="text" name="billing_postal_code" id="billing_postal_code" required><br>
-
-    <label for="billing_city">Billing City:</label>
-    <input type="text" name="billing_city" id="billing_city" required><br>
-
-    <!-- Contact Information -->
-    <label for="email">Email:</label>
-    <input type="email" name="email" required><br>
-
-    <label for="phone">Phone:</label>
-    <input type="text" name="phone" required><br>
-
-    <input type="submit" value="Register">
+    <button type="submit" class="btn btn-primary">Register</button>
 </form>
 
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const sameRadio = document.getElementById('billing_same');
-    const customRadio = document.getElementById('billing_custom');
-    const form = document.querySelector('form');
+document.addEventListener('DOMContentLoaded', () => {
+    const same = document.getElementById('billing_same');
+    const custom = document.getElementById('billing_custom');
+    const billingGroup = document.querySelector('.billing-fields');
 
-    function toggleBillingFields(isSame) {
-        const map = {
-            'company_address': 'billing_address',
-            'street_number': 'billing_street_number',
-            'postal_code': 'billing_postal_code',
-            'city': 'billing_city'
-        };
+    const map = {
+        company_address: 'billing_address',
+        street_number: 'billing_street_number',
+        postal_code: 'billing_postal_code',
+        city: 'billing_city'
+    };
 
-        for (const [fromId, toId] of Object.entries(map)) {
-            const fromEl = document.getElementById(fromId);
-            const toEl = document.getElementById(toId);
-            if (!fromEl || !toEl) continue;
+    function toggle(isSame) {
+        if (billingGroup) {
+            billingGroup.classList.toggle('hidden', isSame);
+        }
+
+        Object.entries(map).forEach(([src, dst]) => {
+            const from = document.getElementById(src);
+            const to = document.getElementById(dst);
+            if (!from || !to) return;
 
             if (isSame) {
-                toEl.value = fromEl.value;
-                toEl.setAttribute('readonly', true);
-                toEl.removeAttribute('required');
+                to.value = from.value;
+                to.readOnly = true;
+                to.required = false;
             } else {
-                toEl.value = '';
-                toEl.removeAttribute('readonly');
-                toEl.setAttribute('required', true);
+                to.value = '';
+                to.readOnly = false;
+                to.required = true;
             }
-        }
-    }
-
-    if (sameRadio) {
-        sameRadio.addEventListener('change', function() {
-            if (this.checked) toggleBillingFields(true);
         });
     }
 
-    if (customRadio) {
-        customRadio.addEventListener('change', function() {
-            if (this.checked) toggleBillingFields(false);
-        });
-    }
+    if (same) same.addEventListener('change', () => toggle(true));
+    if (custom) custom.addEventListener('change', () => toggle(false));
 
-    form.addEventListener('submit', function() {
-        if (sameRadio && sameRadio.checked) {
-            toggleBillingFields(true);
-        }
+    // Init on load
+    toggle(same && same.checked);
+
+    document.querySelector('.crf-form').addEventListener('submit', () => {
+        if (same && same.checked) toggle(true);
     });
 });
 </script>
-
 <?php
-    $success = false;
 
-    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Enregistrement DB + envoi RabbitMQ si POST
+    $success = false;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         global $wpdb;
         $table_name = 'companies';
 
         $uid = 'WP' . time();
         $current_user = wp_get_current_user();
         $owner_id = get_user_meta($current_user->ID, 'uid', true);
-
-        // ⬇️ Copy company address to billing address if "same address" is selected
 
         $billing_option = $_POST['billing_option'] ?? 'custom';
         if ($billing_option === 'same') {
@@ -162,37 +264,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
         $inserted = $wpdb->insert($table_name, $company_data);
         $success = $inserted !== false;
-    }
 
-    if ($success) {
-        $producer = new CompanyProducer();
-        $producer->sendCompanyData($company_data, 'create');
-        echo "<p style='color:green;'>✅ The company was successfully saved in the database.</p>";
+        if ($success) {
+            $producer = new CompanyProducer();
+            $producer->sendCompanyData($company_data, 'create');
+            echo '<div class="alert alert-success">La société a été enregistrée avec succès.</div>';
+        }
     }
 
     return ob_get_clean();
 }
-
 add_shortcode('company_register_form', 'company_register_form_shortcode');
 
-
 add_shortcode('my_companies', 'show_user_companies');
+
 function show_user_companies() {
-    if (!is_user_logged_in()) return '⛔ Je moet ingelogd zijn.';
+    if (!is_user_logged_in()) {
+        return '<div class="alert alert-error">You must be logged in to view your companies.</div>';
+    }
 
     global $wpdb;
     require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/producercompany.php';
+
     $current_user = wp_get_current_user();
     $owner_uid = get_user_meta($current_user->ID, 'uid', true);
     $producer = new CompanyProducer();
 
-    // 🔁 Update
+    // Handle update
     if (isset($_POST['update_uid'])) {
         $uid = sanitize_text_field($_POST['update_uid']);
-
-        // ⬇️ Background autofill if "same address" is selected
-
         $billing_option = $_POST["billing_option_$uid"] ?? 'custom';
+
         if ($billing_option === 'same') {
             $_POST['billing_address'] = $_POST['company_address'] ?? '';
             $_POST['billing_street_number'] = $_POST['street_number'] ?? '';
@@ -219,116 +321,281 @@ function show_user_companies() {
         $producer->sendCompanyData($updated_data, 'update');
     }
 
-    // 🗑️ Delete
+    // Handle delete
     if (isset($_POST['delete_uid'])) {
         $uid = sanitize_text_field($_POST['delete_uid']);
         $wpdb->delete('companies', ['uid' => $uid]);
         $producer->sendCompanyData(['uid' => $uid], 'delete');
     }
 
-    // Load data
+    // Fetch companies
     $companies = $wpdb->get_results($wpdb->prepare("SELECT * FROM companies WHERE owner_id = %s", $owner_uid));
-    if (empty($companies)) return "<p>📭 Geen bedrijven gevonden.</p>";
+    if (empty($companies)) return '<p>No companies found.</p>';
 
-   
-    $output = "<h3>🗂️ Mijn Bedrijven</h3><ul>";
+    $output = '<div class="crf-form"><h3>My Companies</h3><ul style="list-style:none;padding:0;">';
+
     foreach ($companies as $c) {
         $uid = esc_attr($c->uid);
         $output .= "
-        <li>
-            <strong>{$c->name}</strong><br>
-            <button type='button' onclick=\"document.getElementById('edit-$uid').style.display='block'\">✏️ Bewerken</button>
-            <form method='POST' style='display:inline;'>
-                <input type='hidden' name='delete_uid' value='$uid'>
-                <button type='submit'>🗑️ Verwijderen</button>
+        <li style='border:1px solid #ccc;padding:1rem;margin-bottom:1rem;border-radius:6px;'>
+            <h2>" . esc_html($c->name) . "</h2>
+            <form method='POST' style='display:inline;margin-top:0.5rem;margin-right:0.5rem;'>
+                <input type='hidden' name='delete_uid' value='{$uid}'>
+                <button class='btn' type='submit'>Delete</button>
             </form>
-            <div id='edit-$uid' style='display:none; margin-top:10px;'>
-                <form method='POST'>
-                    <input type='hidden' name='update_uid' value='$uid'>
+            <button class='btn btn-primary' type='button' onclick=\"document.getElementById('edit-{$uid}').style.display='block'\">Edit</button>
 
-                    <label>Naam:</label><input name='company_name' id='company_name_$uid' value='" . esc_attr($c->name) . "' required><br>
-                    <label>Straat:</label><input name='company_address' id='company_address_$uid' value='" . esc_attr($c->street) . "' required><br>
-                    <label>Nummer:</label><input name='street_number' id='street_number_$uid' value='" . esc_attr($c->number) . "' required><br>
-                    <label>Postcode:</label><input name='postal_code' id='postal_code_$uid' value='" . esc_attr($c->postcode) . "' required><br>
-                    <label>Stad:</label><input name='city' id='city_$uid' value='" . esc_attr($c->city) . "' required><br>
+            <div id='edit-{$uid}' style='display:none;margin-top:1.5rem;'>
+                <form method='POST' class='edit-form'>
+                    <input type='hidden' name='update_uid' value='{$uid}'>
 
-                    <label><strong>Billing address:</strong></label><br>
-                    <input type='radio' name='billing_option_$uid' value='same' id='billing_same_$uid'>
-                    <label for='billing_same_$uid'>Same as company address</label><br>
-                    <input type='radio' name='billing_option_$uid' value='custom' id='billing_custom_$uid' checked>
-                    <label for='billing_custom_$uid'>Enter a different billing address</label><br><br>
+                    <div class='form-group'>
+                        <label class='form-label'>Company Name</label>
+                        <input class='form-control' name='company_name' value='" . esc_attr($c->name) . "' required>
+                    </div>
+                    <div class='form-group'>
+                        <label class='form-label'>Street</label>
+                        <input class='form-control' name='company_address' id='company_address_$uid' value='" . esc_attr($c->street) . "' required>
+                    </div>
+                    <div class='form-group'>
+                        <label class='form-label'>Street Number</label>
+                        <input class='form-control' name='street_number' id='street_number_$uid' value='" . esc_attr($c->number) . "' required>
+                    </div>
+                    <div class='form-group'>
+                        <label class='form-label'>Postal Code</label>
+                        <input class='form-control' name='postal_code' id='postal_code_$uid' value='" . esc_attr($c->postcode) . "' required>
+                    </div>
+                    <div class='form-group'>
+                        <label class='form-label'>City</label>
+                        <input class='form-control' name='city' id='city_$uid' value='" . esc_attr($c->city) . "' required>
+                    </div>
 
-                    <label>Billing Street:</label><input name='billing_address' id='billing_address_$uid' value='" . esc_attr($c->billing_street) . "' required><br>
-                    <label>Billing Number:</label><input name='billing_street_number' id='billing_street_number_$uid' value='" . esc_attr($c->billing_number) . "' required><br>
-                    <label>Billing Postal Code:</label><input name='billing_postal_code' id='billing_postal_code_$uid' value='" . esc_attr($c->billing_postcode) . "' required><br>
-                    <label>Billing City:</label><input name='billing_city' id='billing_city_$uid' value='" . esc_attr($c->billing_city) . "' required><br>
+                    <fieldset class='form-group'>
+                        <legend class='form-label'>Billing Address</legend>
+                        <label><input type='radio' name='billing_option_$uid' value='same' id='billing_same_$uid'> Same as company address</label>
+                        <label><input type='radio' name='billing_option_$uid' value='custom' id='billing_custom_$uid' checked> Different address</label>
+                    </fieldset>
 
-                    <label>Email:</label><input name='email' value='" . esc_attr($c->email) . "' required><br>
-                    <label>Phone:</label><input name='phone' value='" . esc_attr($c->phone) . "' required><br><br>
+                    <div id='billing_fields_$uid'>
+                        <div class='form-group'>
+                            <label class='form-label'>Billing Street</label>
+                            <input class='form-control' name='billing_address' id='billing_address_$uid' value='" . esc_attr($c->billing_street) . "' required>
+                        </div>
+                        <div class='form-group'>
+                            <label class='form-label'>Billing Number</label>
+                            <input class='form-control' name='billing_street_number' id='billing_street_number_$uid' value='" . esc_attr($c->billing_number) . "' required>
+                        </div>
+                        <div class='form-group'>
+                            <label class='form-label'>Billing Postal Code</label>
+                            <input class='form-control' name='billing_postal_code' id='billing_postal_code_$uid' value='" . esc_attr($c->billing_postcode) . "' required>
+                        </div>
+                        <div class='form-group'>
+                            <label class='form-label'>Billing City</label>
+                            <input class='form-control' name='billing_city' id='billing_city_$uid' value='" . esc_attr($c->billing_city) . "' required>
+                        </div>
+                    </div>
 
-                    <input type='submit' value='💾 Opslaan'>
-                    <button type='button' onclick=\"document.getElementById('edit-$uid').style.display='none'\">Annuleren</button>
+                    <div class='form-group'>
+                        <label class='form-label'>Email</label>
+                        <input class='form-control' name='email' value='" . esc_attr($c->email) . "' required>
+                    </div>
+                    <div class='form-group'>
+                        <label class='form-label'>Phone</label>
+                        <input class='form-control' name='phone' value='" . esc_attr($c->phone) . "' required>
+                    </div>
+
+                    <button type='submit' class='btn btn-primary'>Save</button>
+                    <button type='button' class='btn' onclick=\"document.getElementById('edit-$uid').style.display='none'\">Cancel</button>
                 </form>
             </div>
-        </li><br>";
+        </li>";
     }
-    $output .= "</ul>";
 
-    // ✅ Javascript
+    $output .= '</ul></div>';
+
+    // JS logic to toggle billing fields visibility
     $output .= "<script>
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('form').forEach(function(form) {
-        const uidField = form.querySelector('input[name=\"update_uid\"]');
-        if (!uidField) return;
-        const uid = uidField.value;
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.edit-form').forEach(function(form) {
+            const uid = form.querySelector('input[name=\"update_uid\"]').value;
+            const same = document.getElementById('billing_same_' + uid);
+            const custom = document.getElementById('billing_custom_' + uid);
+            const billingGroup = document.getElementById('billing_fields_' + uid);
 
-        const radioSame = document.getElementById('billing_same_' + uid);
-        const radioCustom = document.getElementById('billing_custom_' + uid);
-
-        function toggleBillingFields(isSame) {
             const map = {
                 'company_address': 'billing_address',
                 'street_number': 'billing_street_number',
                 'postal_code': 'billing_postal_code',
                 'city': 'billing_city'
             };
-            for (const [fromKey, toKey] of Object.entries(map)) {
-                const fromEl = document.getElementById(fromKey + '_' + uid);
-                const toEl = document.getElementById(toKey + '_' + uid);
-                if (!fromEl || !toEl) continue;
 
-                if (isSame) {
-                    toEl.value = fromEl.value;
-                    toEl.setAttribute('readonly', true);
-                    toEl.removeAttribute('required');
-                } else {
-                    toEl.value = '';
-                    toEl.removeAttribute('readonly');
-                    toEl.setAttribute('required', true);
+            function toggle(isSame) {
+                for (const [from, to] of Object.entries(map)) {
+                    const fromEl = document.getElementById(from + '_' + uid);
+                    const toEl = document.getElementById(to + '_' + uid);
+                    if (!fromEl || !toEl) continue;
+
+                    if (isSame) {
+                        toEl.value = fromEl.value;
+                        toEl.readOnly = true;
+                        toEl.required = false;
+                    } else {
+                        toEl.value = '';
+                        toEl.readOnly = false;
+                        toEl.required = true;
+                    }
                 }
+                if (billingGroup) billingGroup.classList.toggle('hidden', isSame);
             }
-        }
 
-        if (radioSame) {
-            radioSame.addEventListener('change', function () {
-                if (this.checked) toggleBillingFields(true);
-            });
-        }
+            if (same) same.addEventListener('change', () => toggle(true));
+            if (custom) custom.addEventListener('change', () => toggle(false));
 
-        if (radioCustom) {
-            radioCustom.addEventListener('change', function () {
-                if (this.checked) toggleBillingFields(false);
-            });
-        }
-
-        form.addEventListener('submit', function () {
-            if (radioSame && radioSame.checked) {
-                toggleBillingFields(true);
-            }
+            toggle(same && same.checked);
         });
     });
-});
-</script>";
+    </script>";
 
     return $output;
 }
+
+
+function crf_enqueue_inline_style() {
+    if (!is_singular()) return;
+
+    global $post;
+    if (
+        has_shortcode($post->post_content, 'company_register_form') ||
+        has_shortcode($post->post_content, 'my_companies')
+    ) {
+        echo '<style>
+        .hidden {
+    display: none !important;
+}
+
+.crf-form {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.form-group {
+    font-size: 15px;
+    margin-bottom: 1.2rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.55rem 0.8rem;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    background-color:rgb(255, 255, 255);
+    transition: border 0.2s ease-in-out, background 0.2s;
+}
+
+.form-control:focus {
+    border-color: #888;
+    background-color: #fff;
+    outline: none;
+}
+
+fieldset {
+    border: 1px solid #ddd;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+}
+
+legend {
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 0 0.5rem;
+}
+
+input[type="radio"] {
+    margin-right: 6px;
+}
+
+.btn {
+    padding: 0.2rem 1.2rem;
+    font-size: 14px;
+    border: 1px solid #bbb;
+    border-radius: 10px;
+    cursor: pointer;
+    background-color:rgb(255, 255, 255);
+    color: #333;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.btn:hover {
+    background-color: #e8e8e8;
+    border-color: #999;
+}
+
+.btn-primary {
+    background-color:rgb(255, 255, 255);
+    border-color: var(--wp--preset--color--contrast);
+    color:var(--wp--preset--color--contrast);
+}
+
+.btn-primary:hover {
+    background-color:rgb(240, 240, 240);
+    border-color: #999;
+    color: #000;
+}
+
+.alert {
+    padding: 0.8rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+}
+
+.alert-success {
+    background-color: #e6f4ea;
+    color: #276738;
+    border: 1px solid #cde7d7;
+}
+
+.alert-error {
+    background-color: #fbeaea;
+    color: #7a1c1c;
+    border: 1px solid #f5cccc;
+}
+
+.crf-form ul li {
+    list-style: none;
+    margin-bottom: 2rem;
+    padding: 1.2rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color:rgb(255, 255, 255);
+}
+
+.crf-form form {
+    margin-top: 1rem;
+}
+
+.crf-form button {
+    margin-right: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+fieldset.form-group label {
+    display: inline-block;
+    margin-right: 1.5rem;
+    font-weight: normal;
+}
+</style>';
+
+    }
+}
+add_action('wp_head', 'crf_enqueue_inline_style');
