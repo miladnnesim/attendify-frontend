@@ -61,7 +61,7 @@ class Producer {
         // 🧠 Metadata ophalen
         $birth_date = get_user_meta($user_id, 'birth_date', true);
         $phone_number = get_user_meta($user_id, 'phone_number', true);
-        $old_company_uid = get_user_meta($user_id, 'old_company_uid', true);
+        $old_company_vat_number = get_user_meta($user_id, 'old_company_vat_number', true);
 
         $um_table = $wpdb->prefix . 'um_metadata';
         $um_metadata = $wpdb->get_results(
@@ -87,20 +87,20 @@ class Producer {
         $company_uid = $um_data['company_vat_number'] ?? get_user_meta($user_id, 'company_vat_number', true); // 💡 company UID
 
         // ✅ Company-link check
-        if ($company_uid !== $old_company_uid) {
+        if ($company_uid !== $old_company_vat_number) {
             require_once __DIR__ . '/producer_user_link_company.php';
 
-            if (!empty($old_company_uid)) {
-                sendUserCompanyLink($customUserId, $old_company_uid, 'unregister');
-                error_log("❌ Ontkoppeld: user {$customUserId} van oud bedrijf {$old_company_uid}");
+            if (!empty($old_company_vat_number)) {
+                sendUserCompanyLink($customUserId, $old_company_vat_number, 'unregister');
+                error_log("❌ Ontkoppeld: user {$customUserId} van oud bedrijf {$old_company_vat_number}");
             }
 
             if (!empty($company_uid)) {
                 sendUserCompanyLink($customUserId, $company_uid, 'register');
                 error_log("✅ Gekoppeld: user {$customUserId} aan nieuw bedrijf {$company_uid}");
-                update_user_meta($user_id, 'old_company_uid', $company_uid);
+                update_user_meta($user_id, 'old_company_vat_number', $company_uid);
             } else {
-                delete_user_meta($user_id, 'old_company_uid');
+                delete_user_meta($user_id, 'old_company_vat_number');
             }
         }
 
