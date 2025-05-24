@@ -87,12 +87,7 @@ class CompanyConsumer {
             $xml = simplexml_load_string($msg->body);
             if (!$xml) throw new Exception("❌ Ongeldig XML-formaat");
 
-            $sender = (string) $xml->info->sender;
-            if (strtolower($sender) === 'frontend') {
-                error_log("ℹ️ Sender is frontend, message genegeerd maar geacknowledged.");
-                $msg->ack();
-                return;
-            }
+            
 
             $operation = (string) $xml->info->operation;
 
@@ -197,9 +192,9 @@ class CompanyConsumer {
             throw new Exception("❌ Fout in company_employee: ontbrekende uid of company_id");
         }
 
-        if ($employeeOperation === 'update') {
+        if ($employeeOperation === 'register') {
             $this->updateUserMetaCompanyLink($user_uid, $company_uid);
-        } elseif ($employeeOperation === 'delete') {
+        } elseif ($employeeOperation === 'unregister') {
             $this->updateUserMetaCompanyLink($user_uid, '');
         } else {
             throw new Exception("❌ Ongeldige operatie voor user-company link: $employeeOperation");
