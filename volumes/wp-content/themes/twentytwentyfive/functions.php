@@ -1522,5 +1522,4 @@ function render_attendify_homepage() {
 add_shortcode('homepage', 'render_attendify_homepage');
 
 
-
 add_action('init', 'twentytwentyfive_register_block_bindings');
