@@ -1395,10 +1395,9 @@ function render_event_detail_viewer() {
                 <p>Je bent al geregistreerd voor dit event.</p>
                 <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
                     'text' => $event->title,
-'dates'   =>
-          date( 'Ymd\THis\Z', strtotime("$event->start_date {$event->start_time}") )
-          . '/'
-          . date( 'Ymd\THis\Z', strtotime("$event->end_date {$event->end_time}") ),                    'details' => $event->description,
+'dates' => date('Ymd\THis', strtotime("$event->start_date {$event->start_time}")) . '/' .
+          date('Ymd\THis', strtotime("$event->end_date {$event->end_time}")),
+                    'details' => $event->description,
                     'location' => $event->location
                 ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
 
@@ -1449,9 +1448,11 @@ function render_event_detail_viewer() {
                     </form>
                     <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
                         'text' => $session->title,
-                        'dates' => date('Ymd\THis\Z', strtotime($session->date . ' ' . $session->start_time)) . '/' . date('Ymd\THis\Z', strtotime($session->date . ' ' . $session->end_time)),
+                        'dates' => date('Ymd\THis', strtotime($session->date . ' ' . $session->start_time)) . '/' .
+                                date('Ymd\THis', strtotime($session->date . ' ' . $session->end_time)),
                         'details' => $session->description,
-                        'location' => $session->location
+                        'location' => $session->location,
+                        'ctz' => 'Europe/Brussels'
                     ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
                 <?php else: ?>
                     <form method="POST" action="/registerevent">
