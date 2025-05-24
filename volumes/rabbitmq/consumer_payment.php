@@ -8,7 +8,7 @@ class InvoiceConsumer {
     private $connection;
     private $channel;
     private $db;
-    private $queue = 'frontend.invoice';
+    private $queues = ['frontend.invoice', 'frontend.sale'];
 
     public function __construct() {
         $this->connectToDB();
@@ -90,13 +90,17 @@ class InvoiceConsumer {
         $this->channel->basic_qos(null, 1, null);
         error_log("✅ Verbonden met RabbitMQ (queue: {$this->queue})");
     }
-
     private function consume() {
-        $this->channel->basic_consume($this->queue, '', false, false, false, false, [$this, 'handleMessage']);
+        foreach ($this->queues as $queue) {
+            $this->channel->basic_consume($queue, '', false, false, false, false, [$this, 'handleMessage']);
+            error_log("🎧 Luistert naar queue: $queue");
+        }
+
         while ($this->channel->is_consuming()) {
             $this->channel->wait();
         }
     }
+
 
     public function handleMessage(AMQPMessage $msg) {
         try {
