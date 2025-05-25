@@ -73,11 +73,8 @@ if (! $wpdb instanceof WPDB) {
 }
 
 // ⛔ Vermijd echte RabbitMQ-verbindingen in tests
-if (!function_exists('App\sendUserCompanyLink')) {
-
-    function sendUserCompanyLink($uid, $vat, $operation) {
-        // Mock-versie tijdens tests – geen RabbitMQ connectie
-        error_log("Mock sendUserCompanyLink($uid, $vat, $operation)");
+if (!function_exists(__NAMESPACE__ . '\sendUserCompanyLink')) {
+    function sendUserCompanyLink($uid, $company_uid, $operation) {
+        // Mock logica die geen echte AMQP connectie uitvoert
     }
 }
-define('PHPUNIT_RUNNING', true);
