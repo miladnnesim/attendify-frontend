@@ -61,6 +61,8 @@ if (! class_exists('WPDB')) {
         }
     }
 }
+if (!defined('ARRAY_A')) define('ARRAY_A', 1);
+
 
 // Instantieer $wpdb als het nog niet bestaat
 global $wpdb;
