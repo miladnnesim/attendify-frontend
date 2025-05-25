@@ -26,22 +26,25 @@ jobs:
           php-version: "8.2"
           extensions: mbstring, xml, curl
           tools: composer
+
       - name: Cache Composer dependencies
         uses: actions/cache@v3
         with:
-          path: vendor
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          path: volumes/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('volumes/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
       - name: Install dependencies
+        working-directory: volumes
         run: |
           if [ -f composer.json ]; then
             composer install --prefer-dist --no-progress --no-interaction
           fi
 
       - name: Run PHPUnit tests
+        working-directory: volumes
         run: |
-          ./vendor/bin/phpunit --configuration phpunit.xml --testdox
+          ./vendor/bin/phpunit --configuration ../phpunit.xml --testdox
 
   deploy:
     name: Deploy to Server
