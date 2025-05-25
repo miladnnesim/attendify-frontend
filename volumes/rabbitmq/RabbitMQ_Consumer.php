@@ -102,7 +102,7 @@ class RabbitMQ_Consumer {
         }
     }
  
-    private function handleMessage(AMQPMessage $msg, $sender) {
+    public function handleMessage(AMQPMessage $msg, $sender) {
         $xml = simplexml_load_string($msg->body);
         if (!$xml) {
             throw new Exception("Ongeldig XML-formaat");
