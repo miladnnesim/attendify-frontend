@@ -1,9 +1,11 @@
 <?php
+namespace App;
+
 // dit is je PHPUnit-bootstrap
 
 // 1️⃣ laad je Composer-autoloader
 require_once __DIR__ . '/../vendor/autoload.php';
-
+use App\sendUserCompanyLink;
 // 2️⃣ definieer WP-stubs, maar alleen als ze nog niet bestaan
 if (! function_exists('get_userdata')) {
     function get_userdata($id) {
@@ -68,4 +70,13 @@ if (!defined('ARRAY_A')) define('ARRAY_A', 1);
 global $wpdb;
 if (! $wpdb instanceof WPDB) {
     $wpdb = new WPDB();
+}
+
+// ⛔ Vermijd echte RabbitMQ-verbindingen in tests
+if (!function_exists('App\sendUserCompanyLink')) {
+
+    function sendUserCompanyLink($uid, $vat, $operation) {
+        // Mock-versie tijdens tests – geen RabbitMQ connectie
+        error_log("Mock sendUserCompanyLink($uid, $vat, $operation)");
+    }
 }
