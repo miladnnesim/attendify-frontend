@@ -41,6 +41,9 @@ class RabbitMQ_ConsumerTest extends TestCase
 
     public function testCreateUser(): void
     {
+      putenv('WORDPRESS_HOST=http://localhost');
+      putenv('MY_API_SHARED_SECRET=dummytoken');
+
         $xml = <<<XML
 <attendify>
   <info><operation>create</operation><sender>crm</sender></info>
