@@ -12,8 +12,56 @@ function company_register_form_shortcode() {
     if (!is_user_logged_in()) {
         return '<div class="alert alert-error">You must be logged in to register a company</div>';
     }
+    $message = '';
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        global $wpdb;
+        $table_name = 'companies';
+        $uid = 'WP' . time();
+        $current_user = wp_get_current_user();
+        $owner_id = get_user_meta($current_user->ID, 'uid', true);
 
+        $billing_option = $_POST['billing_option'] ?? 'custom';
+        if ($billing_option === 'same') {
+            $_POST['billing_address'] = $_POST['company_address'] ?? '';
+            $_POST['billing_street_number'] = $_POST['street_number'] ?? '';
+            $_POST['billing_postal_code'] = $_POST['postal_code'] ?? '';
+            $_POST['billing_city'] = $_POST['city'] ?? '';
+        }
+
+        $company_data = [
+            'uid' => $uid,
+            'companyNumber' => substr(sanitize_text_field($_POST['business_number'] ?? ''), 0, 20),
+            'name' => substr(sanitize_text_field($_POST['company_name'] ?? ''), 0, 255),
+            'VATNumber' => substr(sanitize_text_field($_POST['vat_number'] ?? ''), 0, 20),
+            'street' => substr(sanitize_text_field($_POST['company_address'] ?? ''), 0, 255),
+            'number' => substr(sanitize_text_field($_POST['street_number'] ?? ''), 0, 10),
+            'postcode' => substr(sanitize_text_field($_POST['postal_code'] ?? ''), 0, 10),
+            'city' => substr(sanitize_text_field($_POST['city'] ?? ''), 0, 255),
+            'billing_street' => substr(sanitize_text_field($_POST['billing_address'] ?? ''), 0, 255),
+            'billing_number' => substr(sanitize_text_field($_POST['billing_street_number'] ?? ''), 0, 10),
+            'billing_postcode' => substr(sanitize_text_field($_POST['billing_postal_code'] ?? ''), 0, 10),
+            'billing_city' => substr(sanitize_text_field($_POST['billing_city'] ?? ''), 0, 255),
+            'email' => substr(sanitize_email($_POST['email'] ?? ''), 0, 255),
+            'phone' => substr(sanitize_text_field($_POST['phone'] ?? ''), 0, 50),
+            'owner_id' => $owner_id
+        ];
+
+        $inserted = $wpdb->insert($table_name, $company_data);
+
+        if ($inserted !== false) {
+            $producer = new \App\CompanyProducer();
+            $producer->sendCompanyData($company_data, 'create');
+            require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/UserCompanyLinkProducer.php';
+            \App\sendUserCompanyLink($owner_id, $uid, 'register');
+
+            $message = '<div class="alert alert-success">The company has been registered successfully.</div>';
+        } else {
+            $error_msg = $wpdb->last_error ?: 'Unknown database error';
+            $message = '<div class="alert alert-error">Failed to register company: ' . esc_html($error_msg) . '</div>';
+        }
+    }
     ob_start();
+        if (!empty($message)) echo $message;
 
      ?>
 <style>
@@ -218,55 +266,8 @@ input[type="radio"] {
     <?php
 
     // Verwerking van POST-verzoek
-    $success = false;
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        global $wpdb;
-        $table_name = 'companies';
-        $uid = 'WP' . time();
-        $current_user = wp_get_current_user();
-        $owner_id = get_user_meta($current_user->ID, 'uid', true);
-
-        $billing_option = $_POST['billing_option'] ?? 'custom';
-        if ($billing_option === 'same') {
-            $_POST['billing_address'] = $_POST['company_address'] ?? '';
-            $_POST['billing_street_number'] = $_POST['street_number'] ?? '';
-            $_POST['billing_postal_code'] = $_POST['postal_code'] ?? '';
-            $_POST['billing_city'] = $_POST['city'] ?? '';
-        }
-
-        $company_data = [
-            'uid' => $uid,
-            'companyNumber' => substr(sanitize_text_field($_POST['business_number'] ?? ''), 0, 20),
-            'name' => substr(sanitize_text_field($_POST['company_name'] ?? ''), 0, 255),
-            'VATNumber' => substr(sanitize_text_field($_POST['vat_number'] ?? ''), 0, 20),
-            'street' => substr(sanitize_text_field($_POST['company_address'] ?? ''), 0, 255),
-            'number' => substr(sanitize_text_field($_POST['street_number'] ?? ''), 0, 10),
-            'postcode' => substr(sanitize_text_field($_POST['postal_code'] ?? ''), 0, 10),
-            'city' => substr(sanitize_text_field($_POST['city'] ?? ''), 0, 255),
-            'billing_street' => substr(sanitize_text_field($_POST['billing_address'] ?? ''), 0, 255),
-            'billing_number' => substr(sanitize_text_field($_POST['billing_street_number'] ?? ''), 0, 10),
-            'billing_postcode' => substr(sanitize_text_field($_POST['billing_postal_code'] ?? ''), 0, 10),
-            'billing_city' => substr(sanitize_text_field($_POST['billing_city'] ?? ''), 0, 255),
-            'email' => substr(sanitize_email($_POST['email'] ?? ''), 0, 255),
-            'phone' => substr(sanitize_text_field($_POST['phone'] ?? ''), 0, 50),
-            'owner_id' => $owner_id
-        ];
-
-        $inserted = $wpdb->insert($table_name, $company_data);
-        $success = $inserted !== false;
-
-        if ($success) {
-            $producer = new \App\CompanyProducer();
-            $producer->sendCompanyData($company_data, 'create');
-            require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/UserCompanyLinkProducer.php';
-            \App\sendUserCompanyLink($owner_id, $uid, 'register');
-
-            echo '<div class="alert alert-success">The company has been registered successfully.</div>';
-        } else {
-            $error_msg = $wpdb->last_error ?: 'Unknown database error';
-            echo '<div class="alert alert-error">Failed to register company: ' . esc_html($error_msg) . '</div>';
-        }
-    }
+    
+    
 
     return ob_get_clean();
 }
