@@ -133,3 +133,28 @@ XML;
         $this->assertEquals(0, $metaCount);
     }
 }
+
+
+function curl_init($url = null) {
+    return fopen('php://memory', 'r+');
+}
+
+function curl_setopt($ch, $option, $value): void {}
+
+function curl_exec($ch) {
+    return json_encode(['hashed_activation_key' => 'mocked_hash']);
+}
+
+function curl_getinfo($ch, $opt) {
+    return 200;
+}
+
+function curl_errno($ch) {
+    return 0;
+}
+
+function curl_error($ch) {
+    return '';
+}
+
+function curl_close($ch): void {}
