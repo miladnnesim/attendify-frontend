@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 use PhpAmqpLib\Message\AMQPMessage;
 use PDO;
 
-class RabbitMQConsumerTest extends TestCase
+class RabbitMQ_ConsumerTest extends TestCase
 {
     private $pdo;
     private $consumer;
