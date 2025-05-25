@@ -266,10 +266,12 @@ class InvoiceConsumer {
     }
 }
 
-try {
-    $consumer = new InvoiceConsumer();
-    $consumer->run();
-} catch (Exception $e) {
-    error_log("❌ InvoiceConsumer kon niet starten: " . $e->getMessage());
-    exit(1);
+if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
+    try {
+        $consumer = new InvoiceConsumer();
+        $consumer->run();
+    } catch (Exception $e) {
+        error_log("❌ InvoiceConsumer kon niet starten: " . $e->getMessage());
+        exit(1);
+    }
 }
