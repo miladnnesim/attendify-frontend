@@ -8,8 +8,8 @@
  * @subpackage Twenty_Twenty_Five
  * @since Twenty Twenty-Five 1.0
  */
-require_once ABSPATH . '/rabbitmq/producer.php';
-require_once ABSPATH . '/rabbitmq/produceruserlinkevent.php';
+require_once ABSPATH . '/rabbitmq/ProducerUser.php';
+require_once ABSPATH . '/rabbitmq/RegistrationMessageProducer.php';
 
 
 // Adds theme support for post formats.
@@ -288,7 +288,7 @@ function save_custom_fields_in_account($changes, $user_id) {
 function send_user_data_to_rabbitmq_create($user_id, $args) {
     sleep(2); // wacht 2 seconden
     try {
-        $producer = new Producer();
+        $producer = new \App\ProducerUser();
         $producer->sendUserData($user_id, 'create');
     } catch (Exception $e) {
         error_log("Failed to send user data to RabbitMQ (create): " . $e->getMessage());
@@ -298,7 +298,7 @@ add_action('um_registration_complete', 'send_user_data_to_rabbitmq_create', 10, 
 // Hook into user update (voor update)
 function send_user_data_to_rabbitmq_update($user_id, $old_data) {
     try {
-        $producer = new Producer();
+        $producer = new \App\ProducerUser();
         $producer->sendUserData($user_id, 'update');
     } catch (Exception $e) {
         error_log("Failed to send user data to RabbitMQ (update): " . $e->getMessage());
@@ -312,7 +312,7 @@ add_action('profile_update', 'send_user_data_to_rabbitmq_update', 10, 2);
 // Hook into user deletion (voor delete)
 function send_user_delete_to_rabbitmq($user_id) {
     try {
-        $producer = new Producer();
+        $producer = new \App\ProducerUser();
         $producer->sendUserData($user_id, 'delete');
     } catch (Exception $e) {
         error_log("Failed to send user data to RabbitMQ (delete): " . $e->getMessage());
@@ -790,10 +790,10 @@ add_action('init', function () {
 
         try {
             if ($session_uid) {
-                sendRegistrationMessage('session', $uid, $session_uid, 'unregister');
+                \App\sendRegistrationMessage('session', $uid, $session_uid, 'unregister');
                 wp_redirect(add_query_arg('unregistered', 'session', wp_get_referer()));
             } elseif ($event_uid) {
-                sendRegistrationMessage('event', $uid, $event_uid, 'unregister');
+                \App\sendRegistrationMessage('event', $uid, $event_uid, 'unregister');
                 wp_redirect(add_query_arg('unregistered', 'event', wp_get_referer()));
             } else {
                 wp_die('Ongeldige annuleringsgegevens.');
@@ -824,10 +824,10 @@ add_action('init', function () {
 
         try {
             if ($session_uid) {
-                sendRegistrationMessage('session', $uid, $session_uid); // ✅ goed
+                \App\sendRegistrationMessage('session', $uid, $session_uid); // ✅ goed
                 wp_redirect(add_query_arg('registered', 'session', wp_get_referer()));
             } elseif ($event_uid) {
-                sendRegistrationMessage('event', $uid, $event_uid); // ✅ goed
+                \App\sendRegistrationMessage('event', $uid, $event_uid); // ✅ goed
                 // Tijdzone correct instellen
                 date_default_timezone_set('Europe/Brussels');
 
@@ -1333,7 +1333,6 @@ function render_event_detail_viewer() {
     }
     .button {
         display: inline-block;
-        margin: 10px 10px 0 0;
         padding: 8px 12px;
         background: #0073aa;
         color: white;
@@ -1349,8 +1348,21 @@ function render_event_detail_viewer() {
     .button.red {
         background: #d63638;
     }
-    .button.red:hover {
-        background: #a90002;
+    .button.red.outline {
+        background-color: #fff;
+        color: #d63638;
+        border: 2px solid #d63638;
+    }
+    .button.red.outline:hover {
+        background-color: #fbeaea;
+        color: #a90002;
+        border-color: #a90002;
+    }
+    .button-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
     }
     .session-block {
         background: #f9f9f9;
@@ -1364,27 +1376,39 @@ function render_event_detail_viewer() {
         display: inline-block;
         font-size: 14px;
         text-decoration: none;
+        
         color: #0073aa;
     }
     .back-link:hover {
         text-decoration: underline;
     }
+    .link {
+        margin-top: 10px;
+        display: inline-block;
+        font-size: 20px;
+        text-decoration: none;
+        color: #0073aa;
+        text-decoration: underline;
+
+    }
+    .link:hover {
+        color:rgb(0, 44, 65);
+    }
     </style>
 
     <div class="event-detail-container">
-        <a href="<?php echo esc_url(wp_get_referer())  ?>" class="back-link">← Terug naar eventlijst</a>
+        <a href="/event-en-session" class="back-link">← Terug naar eventlijst</a>
 
         <h2><?php echo esc_html($event->title); ?></h2>
 
         <div class="event-meta">
-<p><strong>Datum & Tijd:</strong>
-  <?php
-    echo esc_html( date_i18n( 'd/m/Y H:i', strtotime("$event->start_date {$event->start_time}") ) );
-    echo ' – ';
-    echo esc_html( date_i18n( 'd/m/Y H:i', strtotime("$event->end_date {$event->end_time}") ) );
-  ?>
-</p>            <p><strong>Locatie:</strong> <?php echo esc_html($event->location); ?></p>
-            
+            <p><strong>Datum & Tijd:</strong>
+                <?php
+                echo esc_html(date_i18n('d/m/Y H:i', strtotime("$event->start_date {$event->start_time}"))) . ' – ' .
+                     esc_html(date_i18n('d/m/Y H:i', strtotime("$event->end_date {$event->end_time}")));
+                ?>
+            </p>
+            <p><strong>Locatie:</strong> <?php echo esc_html($event->location); ?></p>
             <p><strong>Toegang:</strong> €<?php echo number_format($event->entrance_fee, 2); ?></p>
         </div>
 
@@ -1393,18 +1417,24 @@ function render_event_detail_viewer() {
         <?php if ($is_logged_in): ?>
             <?php if ($is_registered): ?>
                 <p>Je bent al geregistreerd voor dit event.</p>
-                <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
-                    'text' => $event->title,
-'dates' => date('Ymd\THis', strtotime("$event->start_date {$event->start_time}")) . '/' .
-          date('Ymd\THis', strtotime("$event->end_date {$event->end_time}")),
-                    'details' => $event->description,
-                    'location' => $event->location
-                ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
-
-                <form method="POST" action="/unregisterevent">
-                    <input type="hidden" name="event_uid" value="<?php echo esc_attr($uid); ?>">
-                    <button type="submit" class="button red">Annuleer registratie</button>
-                </form>
+                <div class="button-group">
+                    <form method="POST" action="/unregisterevent" style="margin: 0;">
+                        <input type="hidden" name="event_uid" value="<?php echo esc_attr($uid); ?>">
+                        <button type="submit" class="button red outline">Annuleer registratie</button>
+                    </form>
+                    <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                        'text' => $event->title,
+                        'dates' => date('Ymd\THis', strtotime("$event->start_date {$event->start_time}")) . '/' .
+                                   date('Ymd\THis', strtotime("$event->end_date {$event->end_time}")),
+                        'details' => $event->description,
+                        'location' => $event->location
+                    ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
+                    
+                    
+                </div>
+              
+                <a href="https://calendar.google.com/calendar/u/0/r?cid=integrationfront@gmail.com"
+           target="_blank" class="link">Of abonneer je op de kalender voor alle evenementen en sessies</a>
             <?php else: ?>
                 <form method="POST" action="/registerevent">
                     <input type="hidden" name="event_uid" value="<?php echo esc_attr($uid); ?>">
@@ -1442,18 +1472,20 @@ function render_event_detail_viewer() {
                 <?php elseif (!$is_registered): ?>
                     <p><em>Registreer eerst voor het event om sessies te kunnen bijwonen.</em></p>
                 <?php elseif ($is_session_registered): ?>
-                    <form method="POST" action="/unregisterevent">
-                        <input type="hidden" name="session_uid" value="<?php echo esc_attr($session->uid); ?>">
-                        <button type="submit" class="button red">Annuleer registratie</button>
-                    </form>
-                    <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
-                        'text' => $session->title,
-                        'dates' => date('Ymd\THis', strtotime($session->date . ' ' . $session->start_time)) . '/' .
-                                date('Ymd\THis', strtotime($session->date . ' ' . $session->end_time)),
-                        'details' => $session->description,
-                        'location' => $session->location,
-                        'ctz' => 'Europe/Brussels'
-                    ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
+                    <div class="button-group">
+                        <form method="POST" action="/unregisterevent" style="margin: 0;">
+                            <input type="hidden" name="session_uid" value="<?php echo esc_attr($session->uid); ?>">
+                            <button type="submit" class="button red outline">Annuleer registratie</button>
+                        </form>
+                        <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
+                            'text' => $session->title,
+                            'dates' => date('Ymd\THis', strtotime($session->date . ' ' . $session->start_time)) . '/' .
+                                       date('Ymd\THis', strtotime($session->date . ' ' . $session->end_time)),
+                            'details' => $session->description,
+                            'location' => $session->location,
+                            'ctz' => 'Europe/Brussels'
+                        ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
+                    </div>
                 <?php else: ?>
                     <form method="POST" action="/registerevent">
                         <input type="hidden" name="session_uid" value="<?php echo esc_attr($session->uid); ?>">
@@ -1468,6 +1500,7 @@ function render_event_detail_viewer() {
     return ob_get_clean();
 }
 add_shortcode('event_detail_viewer', 'render_event_detail_viewer');
+
 
 add_action('after_setup_theme', function () {
     remove_theme_support('core-block-patterns');

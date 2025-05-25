@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="volumes/tests/bootstrap.php"
+         colors="true"
+         verbose="true">
+    <testsuites>
+        <testsuite name="Attendify Tests">
+            <directory>volumes/tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
