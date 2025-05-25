@@ -297,9 +297,13 @@ class UnifiedConsumerEventSession {
     }
 }
 
-try {
-    new UnifiedConsumerEventSession();
-} catch (Exception $e) {
-    error_log("❌ Consumer failed to start: " . $e->getMessage());
-    exit(1);
+// onderaan UnifiedConsumerEventSession.php
+if (php_sapi_name() === 'cli' && realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
+    try {
+        // In productie wil je wél automatisch starten
+        new UnifiedConsumerEventSession();
+    } catch (Exception $e) {
+        error_log("❌ Consumer failed to start: " . $e->getMessage());
+        exit(1);
+    }
 }
