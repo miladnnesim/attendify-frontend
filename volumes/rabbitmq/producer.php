@@ -1,5 +1,7 @@
 <?php
 namespace App;
+require_once __DIR__ . '/../vendor/autoload.php';
+
 // Load WordPress environment if not already loaded
 if (!function_exists('get_userdata')) {
     $wp_load_path = dirname(__DIR__) . '/wp-load.php';
@@ -10,7 +12,6 @@ if (!function_exists('get_userdata')) {
     }
 }
 
-require_once __DIR__ . '/../vendor/autoload.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
