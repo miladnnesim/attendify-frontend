@@ -7,6 +7,7 @@ use PhpAmqpLib\Channel\AMQPChannel;
 use InvalidArgumentException;
 use DOMDocument;
 use SimpleXMLElement;
+use PhpAmqpLib\Connection\AMQPStreamConnection;
 
 class UserCompanyLinkProducer {
     private AMQPChannel $channel;
