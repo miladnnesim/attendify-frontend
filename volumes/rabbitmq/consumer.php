@@ -1,4 +1,5 @@
 <?php
+namespace App;
 require_once '/var/www/html/vendor/autoload.php';
  
 use PhpAmqpLib\Connection\AMQPStreamConnection;

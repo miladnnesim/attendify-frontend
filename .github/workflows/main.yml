@@ -26,23 +26,22 @@ jobs:
           php-version: "8.2"
           extensions: mbstring, xml, curl
           tools: composer
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
 
       - name: Install dependencies
         run: |
           if [ -f composer.json ]; then
-            composer install --no-dev --prefer-dist --no-progress --no-interaction
+            composer install --prefer-dist --no-progress --no-interaction
           fi
-
-      - name: Lint PHP files
-        run: find . -name "*.php" -print0 | xargs -0 -n1 php -l
 
       - name: Run PHPUnit tests
         run: |
-          if [ -f vendor/bin/phpunit ]; then
-            vendor/bin/phpunit
-          else
-            echo "PHPUnit not found, skipping tests."
-          fi
+          ./vendor/bin/phpunit --configuration phpunit.xml --testdox
 
   deploy:
     name: Deploy to Server

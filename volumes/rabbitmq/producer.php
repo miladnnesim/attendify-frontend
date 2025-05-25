@@ -1,4 +1,5 @@
 <?php
+namespace App;
 // Load WordPress environment if not already loaded
 if (!function_exists('get_userdata')) {
     $wp_load_path = dirname(__DIR__) . '/wp-load.php';
