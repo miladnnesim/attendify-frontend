@@ -13,6 +13,7 @@ class InvoiceConsumerTest extends TestCase {
     protected function setUp(): void {
         $this->pdo = new \PDO('sqlite::memory:');
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $this->pdo->exec('PRAGMA foreign_keys = ON;'); // 👈 OBLIGATOIRE
 
         $this->pdo->exec("CREATE TABLE event_payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
