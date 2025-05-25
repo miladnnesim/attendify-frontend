@@ -236,6 +236,7 @@ class CompanyConsumer {
         }
     }
 }
+if (php_sapi_name() === 'cli' && ! defined('PHPUNIT_RUNNING')) {
 
 try {
     $consumer = new CompanyConsumer(); // geen connectie met queue of db in tests
@@ -243,4 +244,5 @@ try {
 } catch (Exception $e) {
     error_log("❌ CompanyConsumer kon niet starten: " . $e->getMessage());
     exit(1);
+}
 }
