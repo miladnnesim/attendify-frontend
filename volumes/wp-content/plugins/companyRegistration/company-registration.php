@@ -6,7 +6,7 @@
  * Author: Attendify
  */
 
-require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/producercompany.php';
+require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/CompanyProducer.php';
 
 function company_register_form_shortcode() {
     if (!is_user_logged_in()) {
@@ -258,7 +258,7 @@ input[type="radio"] {
         if ($success) {
             $producer = new CompanyProducer();
             $producer->sendCompanyData($company_data, 'create');
-            require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/producer_user_link_company.php';
+            require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/UserCompanyLinkProducer.php';
             sendUserCompanyLink($owner_id, $uid, 'register');
 
             echo '<div class="alert alert-success">The company has been registered successfully.</div>';
@@ -281,7 +281,7 @@ function show_user_companies() {
     }
 
     global $wpdb;
-    require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/producercompany.php';
+    require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/CompanyProducer.php';
 
     $current_user = wp_get_current_user();
     $owner_uid = get_user_meta($current_user->ID, 'uid', true);

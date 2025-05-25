@@ -14,7 +14,12 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
-
+use PDO;
+use PDOStatement;
+use Exception;
+use DateTime;
+use SimpleXMLElement;
+use DOMDocument;
 class Producer {
     private $channel;
     private $connection;
@@ -94,7 +99,7 @@ class Producer {
 
         // ✅ Company-link check
         if ($company_uid !== $old_company_vat_number) {
-            require_once __DIR__ . '/producer_user_link_company.php';
+            require_once __DIR__ . '/UserCompanyLinkProducer.php';
 
             if (!empty($old_company_vat_number)) {
                 sendUserCompanyLink($customUserId, $old_company_vat_number, 'unregister');

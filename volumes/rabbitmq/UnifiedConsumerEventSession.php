@@ -6,8 +6,13 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Exception\AMQPIOException;
 use PhpAmqpLib\Channel\AMQPChannel;
+use PDO;
+use PDOStatement;
+use Exception;
+use DateTime;
+use SimpleXMLElement;
 
-class UnifiedConsumer {
+class UnifiedConsumerEventSession {
     private $connection;
     private $channel;
     private $db;
@@ -293,7 +298,7 @@ class UnifiedConsumer {
 }
 
 try {
-    new UnifiedConsumer();
+    new UnifiedConsumerEventSession();
 } catch (Exception $e) {
     error_log("❌ Consumer failed to start: " . $e->getMessage());
     exit(1);

@@ -5,7 +5,11 @@ require_once '/var/www/html/vendor/autoload.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Channel\AMQPChannel;
-
+use PDO;
+use PDOStatement;
+use Exception;
+use DateTime;
+use SimpleXMLElement;
 class InvoiceConsumer {
     private $connection;
     private $channel;

@@ -3,6 +3,8 @@ namespace Tests;
 use PHPUnit\Framework\TestCase;
 use PhpAmqpLib\Message\AMQPMessage;
 use App\InvoiceConsumer;
+use Exception;
+use PDO;
 
 class InvoiceConsumerTest extends TestCase {
     private $pdo;

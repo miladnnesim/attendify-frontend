@@ -8,7 +8,7 @@ services:
     volumes:
       - ./volumes/rabbitmq:/var/www/html/rabbitmq
       - ./volumes/vendor:/var/www/html/vendor
-    command: php /var/www/html/rabbitmq/consumer_payment.php
+    command: php /var/www/html/rabbitmq/InvoiceConsumer.php
     depends_on:
       - db
     restart: always
@@ -117,7 +117,7 @@ services:
       - LOCAL_DB_USER=${LOCAL_DB_USER}
       - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
       - LOCAL_DB_NAME=${LOCAL_DB_NAME}
-    command: php /var/www/html/rabbitmq/consumer.php
+    command: php /var/www/html/rabbitmq/RabbitMQ_Consumer.php
     depends_on:
       - db
     restart: always
@@ -139,7 +139,7 @@ services:
       - LOCAL_DB_USER=${LOCAL_DB_USER}
       - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
       - LOCAL_DB_NAME=${LOCAL_DB_NAME}
-    command: php /var/www/html/rabbitmq/consumerevent.php
+    command: php /var/www/html/rabbitmq/UnifiedConsumerEventSession.php
     depends_on:
       - db
     restart: always
@@ -182,7 +182,7 @@ services:
       - LOCAL_DB_USER=${LOCAL_DB_USER}
       - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD}
       - LOCAL_DB_NAME=${LOCAL_DB_NAME}
-    command: php /var/www/html/rabbitmq/consumercompany.php
+    command: php /var/www/html/rabbitmq/CompanyConsumer.php
     depends_on:
       - db
     restart: always

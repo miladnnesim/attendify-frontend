@@ -6,6 +6,11 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Exception\AMQPIOException;
 use PhpAmqpLib\Channel\AMQPChannel;
+use PDO;
+use PDOStatement;
+use Exception;
+use DateTime;
+use SimpleXMLElement;
 
 class RabbitMQ_Consumer {
     private $connection;
