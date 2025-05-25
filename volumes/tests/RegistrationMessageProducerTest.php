@@ -1,11 +1,13 @@
 <?php
 namespace Tests;
 use PHPUnit\Framework\TestCase;
-use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
+use PhpAmqpLib\Channel\AMQPChannel;
 use App\RegistrationMessageProducer;
 use Exception;
 use PDO;
+use InvalidArgumentException;
+
 class RegistrationMessageProducerTest extends TestCase {
     public function testSendRegistrationMessageEvent() {
         $mockChannel = $this->createMock(AMQPChannel::class);
