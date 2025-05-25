@@ -219,9 +219,11 @@ class ProducerUser {
 }
 
 // For manual testing
-if (php_sapi_name() === 'cli') {
-    $user_id = $argv[1] ?? 1;
+// For manual testing (NIET tijdens PHPUnit)
+if (php_sapi_name() === 'cli' && ! defined('PHPUNIT_RUNNING')) {
+    $user_id   = $argv[1] ?? 1;
     $operation = $argv[2] ?? 'create';
-    $producer = new ProducerUser();
+    $producer  = new ProducerUser();
     $producer->sendUserData($user_id, $operation);
 }
+
