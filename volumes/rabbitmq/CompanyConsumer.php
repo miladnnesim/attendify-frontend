@@ -50,6 +50,17 @@ class CompanyConsumer {
     }
 
     public function initTables(): void {
+            $is_sqlite = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+
+    if ($is_sqlite) {
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS companies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        ");
+    } else {
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS companies (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -57,6 +68,7 @@ class CompanyConsumer {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+    }
 
         $columns = [
             'uid' => 'VARCHAR(30) UNIQUE',
