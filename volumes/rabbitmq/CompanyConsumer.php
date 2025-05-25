@@ -89,12 +89,28 @@ class CompanyConsumer {
         ];
 
         foreach ($columns as $col => $type) {
+        $driver = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'sqlite') {
+            // SQLite: haal kolomnamen uit PRAGMA table_info
+            $colNames = array_column(
+                $this->db->query("PRAGMA table_info(companies)")->fetchAll(\PDO::FETCH_ASSOC),
+                'name'
+            );
+            if (!in_array($col, $colNames)) {
+                $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
+                error_log("ℹ️ [sqlite] Kolom '$col' toegevoegd aan 'companies'");
+            }
+        } else {
+            // MySQL
             $stmt = $this->db->query("SHOW COLUMNS FROM companies LIKE '$col'");
             if ($stmt->rowCount() === 0) {
                 $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
-                error_log("ℹ️ Kolom '$col' toegevoegd aan 'companies'");
+                error_log("ℹ️ [mysql] Kolom '$col' toegevoegd aan 'companies'");
             }
         }
+    }
+
     }
 
     private function consume(): void {
