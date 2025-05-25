@@ -46,7 +46,7 @@ class RabbitMQ_ConsumerTest extends TestCase
 
         $xml = <<<XML
 <attendify>
-  <info><operation>create</operation><sender>crm</sender></info>
+  <info><operation>create</operation><sender>billing</sender></info>
   <user>
     <uid>user123</uid>
     <email>test@example.com</email>
