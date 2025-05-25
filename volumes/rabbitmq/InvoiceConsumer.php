@@ -242,7 +242,7 @@ class InvoiceConsumer {
                 error_log("❌ Geen bestaande tab voor delete ($uid, $event_id)");
                 return;
             }
-
+            error_log("🔍 Deleting tab with id = $tab_id");
             $this->db->prepare("DELETE FROM tab_sales WHERE id = :id")->execute([':id' => $tab_id]);
             return;
         } else {
