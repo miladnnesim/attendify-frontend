@@ -133,11 +133,14 @@ class CompanyConsumer {
                 $this->handleCompanyEmployee($xml->company_employee, $operation);
             }
 
-            $msg->ack();
-        } catch (Exception $e) {
-            error_log("[ERROR] " . $e->getMessage());
-            $msg->ack(); // Geen eindeloze retry loop
+        $msg->ack();
+    } catch (Exception $e) {
+        error_log("[ERROR] " . $e->getMessage());
+        $msg->ack();
+        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+            throw $e;
         }
+    }
     }
 
     private function handleCompany(SimpleXMLElement $company, string $operation): void {
