@@ -130,8 +130,3 @@ XML;
         $this->assertEquals(0, $metaCount);
     }
 }
-
-class FakeAMQPMessage extends AMQPMessage {
-    public function ack($multiple = false): void {}
-    public function nack($multiple = false, $requeue = false): void {}
-}
