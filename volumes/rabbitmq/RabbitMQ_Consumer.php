@@ -433,10 +433,12 @@ class RabbitMQ_Consumer {
  
  
  
-try {
-    $consumer = new RabbitMQ_Consumer();
-    $consumer->run();
-} catch (Exception $e) {
-    error_log("Consumer failed to start: " . $e->getMessage());
-    exit(1);
+if (__FILE__ === realpath($_SERVER['SCRIPT_FILENAME'])) {
+    try {
+        $consumer = new RabbitMQ_Consumer();
+        $consumer->run();
+    } catch (Exception $e) {
+        error_log("Consumer failed to start: " . $e->getMessage());
+        exit(1);
+    }
 }
