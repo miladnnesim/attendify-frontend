@@ -39,6 +39,7 @@ jobs:
         run: |
           if [ -f composer.json ]; then
             composer install --prefer-dist --no-progress --no-interaction
+            composer dump-autoload --optimize
           fi
 
       - name: Run PHPUnit tests
