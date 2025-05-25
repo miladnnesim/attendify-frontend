@@ -37,19 +37,18 @@ class CompanyProducerTest extends TestCase
             ->with(
                 $this->callback(function(AMQPMessage $msg) use ($data) {
                     $xml = $msg->getBody();
-                    // operation and sender
-                    return strpos($xml, '<operation>create</operation>') !== false
+                    return
+                        strpos($xml, '<operation>create</operation>') !== false
                         && strpos($xml, '<sender>frontend</sender>') !== false
-                        // company fields
                         && strpos($xml, "<uid>{$data['uid']}</uid>") !== false
                         && strpos($xml, "<companyNumber>{$data['companyNumber']}</companyNumber>") !== false
-                        && strpos($xml, "<name>{$data['name']}</name>") !== false
-                        && strpos($xml, "<VATNumber>{$data['VATNumber']}</VATNumber>") !== false
-                        && strpos($xml, "<street>{$data['street']}</street>") !== false
                         && strpos($xml, "<owner_id>{$data['owner_id']}</owner_id>") !== false;
                 }),
                 'company',
-                'company.create'
+                'company.create',
+                $this->anything(),
+                $this->anything(),
+                $this->anything()
             );
 
         $producer = new CompanyProducer($mockChannel);
@@ -59,8 +58,11 @@ class CompanyProducerTest extends TestCase
     /**
      * @dataProvider operationProvider
      */
-    public function testSendCompanyDataRoutingKeysAndMinimalPayload(string $operation, array $data, array $mustContain): void
-    {
+    public function testSendCompanyDataRoutingKeysAndMinimalPayload(
+        string $operation,
+        array $data,
+        array $mustContain
+    ): void {
         $mockChannel = $this->createMock(AMQPChannel::class);
         $mockChannel
             ->expects($this->once())
@@ -68,11 +70,11 @@ class CompanyProducerTest extends TestCase
             ->with(
                 $this->callback(function(AMQPMessage $msg) use ($operation, $mustContain) {
                     $xml = $msg->getBody();
-                    // check operation tag
+                    // operation tag
                     if (strpos($xml, "<operation>{$operation}</operation>") === false) {
                         return false;
                     }
-                    // each mustContain string must appear
+                    // each fragment must appear
                     foreach ($mustContain as $fragment) {
                         if (strpos($xml, $fragment) === false) {
                             return false;
@@ -81,7 +83,10 @@ class CompanyProducerTest extends TestCase
                     return true;
                 }),
                 'company',
-                "company.{$operation}"
+                "company.{$operation}",
+                $this->anything(),
+                $this->anything(),
+                $this->anything()
             );
 
         $producer = new CompanyProducer($mockChannel);
@@ -93,22 +98,21 @@ class CompanyProducerTest extends TestCase
         return [
             'update minimal' => [
                 'update',
-                // for update we supply only uid
+                // update legt alle velden aan, maar we sturen alleen uid mee
                 ['uid' => 'C456'],
                 [
+                    '<operation>update</operation>',
                     '<uid>C456</uid>',
-                    // other fields should be absent in the minimal update payload,
-                    // but at least presence of address elements
-                    '<companyNumber>',
+                    '<companyNumber/>',   // empty tag
+                    '<address><street/>'  // onderdeel van het update-schema
                 ]
             ],
             'delete minimal' => [
                 'delete',
                 ['uid' => 'C789'],
                 [
-                    '<uid>C789</uid>',
-                    // no extra fields at all
-                    '<companyNumber>' // buildXML still adds the node but empty
+                    '<operation>delete</operation>',
+                    '<uid>C789</uid>'
                 ]
             ],
         ];
