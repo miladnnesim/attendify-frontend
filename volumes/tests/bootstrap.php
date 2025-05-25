@@ -23,7 +23,7 @@ if (! function_exists('get_userdata')) {
 if (! function_exists('get_user_meta')) {
     function get_user_meta($uid, $key, $single) {
         if ($key === 'uid')                    return null;
-        if ($key === 'old_company_vat_number') return '';
+        if ($key === 'old_company_vat_number') return 'VAT123';
         return "meta_{$key}";
     }
 }
