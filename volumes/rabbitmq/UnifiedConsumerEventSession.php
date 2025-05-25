@@ -30,9 +30,11 @@ class UnifiedConsumerEventSession {
             $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
             $pdo = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->sendMonitoringLog("✅ Connected to database", "info");
             error_log("✅ Connected to database");
             return $pdo;
         } catch (PDOException $e) {
+            $this->sendMonitoringLog("❌ Database connection failed: " . $e->getMessage(), "error");
             error_log("❌ Database connection failed: " . $e->getMessage());
             exit(1);
         }
@@ -49,7 +51,6 @@ class UnifiedConsumerEventSession {
             'session_id' => 'VARCHAR(255)'
         ], ['user_id', 'session_id']);
 
-        // Table: wp_events
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS wp_events (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -69,7 +70,6 @@ class UnifiedConsumerEventSession {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
-        // Table: wp_sessions
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS wp_sessions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -88,6 +88,7 @@ class UnifiedConsumerEventSession {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+        $this->sendMonitoringLog("✅ All tables initialized", "info");
         error_log("✅ All tables initialized");
     }
 
@@ -104,6 +105,7 @@ class UnifiedConsumerEventSession {
         foreach ($fields as $col => $type) {
             if (!in_array($col, $existing)) {
                 $this->db->exec("ALTER TABLE `$table` ADD COLUMN `$col` $type NOT NULL");
+                $this->sendMonitoringLog("➕ Column '$col' added to '$table'", "info");
                 error_log("➕ Column '$col' added to '$table'");
             }
         }
@@ -123,11 +125,13 @@ class UnifiedConsumerEventSession {
                 );
                 $channel = $this->connection->channel();
                 $channel->basic_qos(null, 1, null);
+                $this->sendMonitoringLog("✅ Connected to RabbitMQ", "info");
                 error_log("✅ Connected to RabbitMQ");
                 return $channel;
             } catch (AMQPIOException $e) {
+                $this->sendMonitoringLog("❌ RabbitMQ connection failed: " . $e->getMessage(), "error");
+                error_log("❌ RabbitMQ connection failed: " . $e->getMessage());
                 if ($i === $maxRetries - 1) {
-                    error_log("❌ RabbitMQ connection failed: " . $e->getMessage());
                     throw $e;
                 }
                 sleep($retryDelay);
@@ -146,8 +150,12 @@ class UnifiedConsumerEventSession {
 
                 if (isset($xml->event_attendee)) {
                     $this->processRegistration('event', $operation, trim((string)$xml->event_attendee->uid), trim((string)$xml->event_attendee->event_id));
+                    $this->sendMonitoringLog("User " . $xml->event_attendee->uid . " event $operation: " . $xml->event_attendee->event_id, "info");
+                    error_log("User " . $xml->event_attendee->uid . " event $operation: " . $xml->event_attendee->event_id);
                 } elseif (isset($xml->session_attendee)) {
                     $this->processRegistration('session', $operation, trim((string)$xml->session_attendee->uid), trim((string)$xml->session_attendee->session_id));
+                    $this->sendMonitoringLog("User " . $xml->session_attendee->uid . " session $operation: " . $xml->session_attendee->session_id, "info");
+                    error_log("User " . $xml->session_attendee->uid . " session $operation: " . $xml->session_attendee->session_id);
                 } elseif (isset($xml->event)) {
                     $this->handleEvent($xml->event, $operation);
                 } elseif (isset($xml->session)) {
@@ -158,6 +166,7 @@ class UnifiedConsumerEventSession {
 
                 $msg->ack();
             } catch (Exception $e) {
+                $this->sendMonitoringLog("[ERROR] " . $e->getMessage(), "error");
                 error_log("[ERROR] " . $e->getMessage());
                 $msg->ack();
             }
@@ -180,11 +189,9 @@ class UnifiedConsumerEventSession {
         if ($operation === 'register') {
             $stmt = $this->db->prepare("INSERT IGNORE INTO `$table` (user_id, `$column`) VALUES (:uid, :eid)");
             $stmt->execute([':uid' => $user_id, ':eid' => $entity_id]);
-            error_log("✅ User $user_id registered for $type $entity_id");
         } elseif ($operation === 'unregister') {
             $stmt = $this->db->prepare("DELETE FROM `$table` WHERE user_id = :uid AND `$column` = :eid");
             $stmt->execute([':uid' => $user_id, ':eid' => $entity_id]);
-            error_log("❌ Registration removed for user $user_id from $type $entity_id");
         } else {
             throw new Exception("Unknown operation: $operation");
         }
@@ -226,11 +233,13 @@ class UnifiedConsumerEventSession {
                     ':ouid' => $this->sanitizeField($event->organizer_uid),
                     ':fee' => $event->entrance_fee
                 ]);
+                $this->sendMonitoringLog("Event $uid " . ($operation === 'create' ? 'created' : 'updated'), "info");
                 error_log("✅ Event $uid " . ($operation === 'create' ? 'created' : 'updated'));
                 break;
             case 'delete':
                 $stmt = $this->db->prepare("DELETE FROM wp_events WHERE uid = :uid");
                 $stmt->execute([':uid' => $uid]);
+                $this->sendMonitoringLog("Event $uid deleted", "info");
                 error_log("❌ Event $uid deleted");
                 break;
             default:
@@ -274,11 +283,13 @@ class UnifiedConsumerEventSession {
                     ':sname' => $this->sanitizeField($session->speaker->name),
                     ':sbio' => $this->sanitizeField($session->speaker->bio)
                 ]);
+                $this->sendMonitoringLog("Session $uid " . ($operation === 'create' ? 'created' : 'updated'), "info");
                 error_log("✅ Session $uid " . ($operation === 'create' ? 'created' : 'updated'));
                 break;
             case 'delete':
                 $stmt = $this->db->prepare("DELETE FROM wp_sessions WHERE uid = :uid");
                 $stmt->execute([':uid' => $uid]);
+                $this->sendMonitoringLog("Session $uid deleted", "info");
                 error_log("❌ Session $uid deleted");
                 break;
             default:
@@ -295,15 +306,39 @@ class UnifiedConsumerEventSession {
             return '>' . htmlspecialchars($matches[1], ENT_XML1) . '<';
         }, $xml);
     }
+
+    private function sendMonitoringLog(string $message, string $level = "info") {
+        if (!$this->channel) {
+            error_log("[monitoring.log skipped]: $message");
+            return;
+        }
+        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+        // Tijdens unit tests: skip publish naar monitoring
+        return;
+    }
+        $sender = "frontend-event-consumer";
+        $timestamp = date('c');
+        $logXml = "<log>"
+            . "<sender>" . htmlspecialchars($sender) . "</sender>"
+            . "<timestamp>" . htmlspecialchars($timestamp) . "</timestamp>"
+            . "<level>" . htmlspecialchars($level) . "</level>"
+            . "<message>" . htmlspecialchars($message) . "</message>"
+            . "</log>";
+        $amqpMsg = new AMQPMessage($logXml);
+        $this->channel->basic_publish($amqpMsg, 'event', 'monitoring.log');
+    }
 }
 
 // onderaan UnifiedConsumerEventSession.php
 if (php_sapi_name() === 'cli' && realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
     try {
-        // In productie wil je wél automatisch starten
         new UnifiedConsumerEventSession();
     } catch (Exception $e) {
         error_log("❌ Consumer failed to start: " . $e->getMessage());
+        // Monitoring log bij opstartfout
+        if (isset($consumer) && method_exists($consumer, 'sendMonitoringLog')) {
+            $consumer->sendMonitoringLog("❌ Consumer failed to start: " . $e->getMessage(), "error");
+        }
         exit(1);
     }
 }

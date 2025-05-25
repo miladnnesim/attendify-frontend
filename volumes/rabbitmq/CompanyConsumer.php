@@ -10,6 +10,7 @@ use PDOStatement;
 use Exception;
 use DateTime;
 use SimpleXMLElement;
+
 class CompanyConsumer {
     private $connection;
     private $channel;
@@ -31,6 +32,7 @@ class CompanyConsumer {
         $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
         $pdo = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->sendMonitoringLog("Verbonden met database", "info");
         error_log("✅ Verbonden met database");
         return $pdo;
     }
@@ -45,30 +47,31 @@ class CompanyConsumer {
         );
         $channel = $this->connection->channel();
         $channel->basic_qos(null, 1, null);
+        $this->sendMonitoringLog("Verbonden met RabbitMQ", "info");
         error_log("✅ Verbonden met RabbitMQ");
         return $channel;
     }
 
     public function initTables(): void {
-            $is_sqlite = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+        $is_sqlite = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
 
-    if ($is_sqlite) {
-        $this->db->exec("
-            CREATE TABLE IF NOT EXISTS companies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                created_at TEXT DEFAULT (datetime('now')),
-                updated_at TEXT DEFAULT (datetime('now'))
-            )
-        ");
-    } else {
-        $this->db->exec("
-            CREATE TABLE IF NOT EXISTS companies (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        ");
-    }
+        if ($is_sqlite) {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS companies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now'))
+                )
+            ");
+        } else {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS companies (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        }
 
         $driver = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
         $columns = [
@@ -97,20 +100,23 @@ class CompanyConsumer {
                 );
                 if (!in_array($col, $colNames)) {
                     $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
+                    $this->sendMonitoringLog("Kolom '$col' toegevoegd aan 'companies' (sqlite)", "info");
+                    error_log("ℹ️ Kolom '$col' toegevoegd aan 'companies' (sqlite)");
                 }
             } else {
                 $stmt = $this->db->query("SHOW COLUMNS FROM companies LIKE '$col'");
                 if ($stmt->rowCount() === 0) {
                     $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
+                    $this->sendMonitoringLog("Kolom '$col' toegevoegd aan 'companies'", "info");
+                    error_log("ℹ️ Kolom '$col' toegevoegd aan 'companies'");
                 }
             }
         }
-
-    
-
     }
 
     private function consume(): void {
+        $this->sendMonitoringLog("Consumer luistert naar queue: {$this->queue}", "info");
+        error_log("🎧 Luistert naar queue: {$this->queue}");
         $this->channel->basic_consume($this->queue, '', false, false, false, false, [$this, 'handleMessage']);
 
         while ($this->channel->is_consuming()) {
@@ -133,14 +139,18 @@ class CompanyConsumer {
                 $this->handleCompanyEmployee($xml->company_employee, $operation);
             }
 
-        $msg->ack();
-    } catch (Exception $e) {
-        error_log("[ERROR] " . $e->getMessage());
-        $msg->ack();
-        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
-            throw $e;
+            $this->sendMonitoringLog("Bericht succesvol verwerkt", "info");
+            error_log("✅ Bericht succesvol verwerkt");
+
+            $msg->ack();
+        } catch (Exception $e) {
+            $this->sendMonitoringLog("[ERROR] " . $e->getMessage(), "error");
+            error_log("[ERROR] " . $e->getMessage());
+            $msg->ack();
+            if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+                throw $e;
+            }
         }
-    }
     }
 
     private function handleCompany(SimpleXMLElement $company, string $operation): void {
@@ -169,6 +179,7 @@ class CompanyConsumer {
                     :email, :phone, :owner_id
                 )
             ");
+            $action = "aangemaakt";
         } elseif ($operation === 'update') {
             if (!$exists) throw new Exception("❌ Bedrijf $uid bestaat niet");
 
@@ -190,9 +201,11 @@ class CompanyConsumer {
                     owner_id = :owner_id
                 WHERE uid = :uid
             ");
+            $action = "bijgewerkt";
         } elseif ($operation === 'delete') {
             $stmt = $this->db->prepare("DELETE FROM companies WHERE uid = :uid");
             $stmt->execute([':uid' => $uid]);
+            $this->sendMonitoringLog("🗑️ Bedrijf $uid verwijderd", "info");
             error_log("🗑️ Bedrijf $uid verwijderd");
             return;
         } else {
@@ -216,6 +229,9 @@ class CompanyConsumer {
             ':phone' => (string) $company->phone,
             ':owner_id' => $owner_id
         ]);
+
+        $this->sendMonitoringLog("Bedrijf $uid $action", "info");
+        error_log("🏢 Bedrijf $uid $action");
     }
 
     private function handleCompanyEmployee(SimpleXMLElement $employee, string $operation): void {
@@ -241,6 +257,7 @@ class CompanyConsumer {
         $user_id = $stmt->fetchColumn();
 
         if (!$user_id) {
+            $this->sendMonitoringLog("❌ Geen gebruiker gevonden met uid: $user_uid", "error");
             error_log("❌ Geen gebruiker gevonden met uid: $user_uid");
             return;
         }
@@ -248,6 +265,7 @@ class CompanyConsumer {
         $this->upsertUserMeta($user_id, 'company_vat_number', $company_uid);
         $this->upsertUserMeta($user_id, 'old_company_vat_number', $company_uid);
 
+        $this->sendMonitoringLog("🔗 Gebruiker $user_uid gelinkt aan bedrijf $company_uid", "info");
         error_log("🔗 Gebruiker $user_uid gelinkt aan bedrijf $company_uid");
     }
 
@@ -263,14 +281,40 @@ class CompanyConsumer {
             $insert->execute([':user_id' => $user_id, ':meta_key' => $meta_key, ':meta_value' => $meta_value]);
         }
     }
-}
-if (php_sapi_name() === 'cli' && ! defined('PHPUNIT_RUNNING')) {
 
-try {
-    $consumer = new CompanyConsumer(); // geen connectie met queue of db in tests
-    $consumer->run();                  // expliciet starten
-} catch (Exception $e) {
-    error_log("❌ CompanyConsumer kon niet starten: " . $e->getMessage());
-    exit(1);
+    private function sendMonitoringLog(string $message, string $level = "info") {
+        if (!$this->channel) {
+            error_log("[monitoring.log skipped]: $message");
+            return;
+        }
+        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+        // Tijdens unit tests: skip publish naar monitoring
+        return;
+    }
+        $sender = "frontend-company-consumer";
+        $timestamp = date('c');
+        $logXml = "<log>"
+            . "<sender>" . htmlspecialchars($sender) . "</sender>"
+            . "<timestamp>" . htmlspecialchars($timestamp) . "</timestamp>"
+            . "<level>" . htmlspecialchars($level) . "</level>"
+            . "<message>" . htmlspecialchars($message) . "</message>"
+            . "</log>";
+        $amqpMsg = new AMQPMessage($logXml);
+        $this->channel->basic_publish($amqpMsg, 'company', 'monitoring.log');
+    }
+
 }
+
+if (php_sapi_name() === 'cli' && ! defined('PHPUNIT_RUNNING')) {
+    try {
+        $consumer = new CompanyConsumer(); // geen connectie met queue of db in tests
+        $consumer->run();                  // expliciet starten
+    } catch (Exception $e) {
+        error_log("❌ CompanyConsumer kon niet starten: " . $e->getMessage());
+        // Ook naar monitoring.log sturen bij start-fout:
+        if (method_exists($consumer ?? null, 'sendMonitoringLog')) {
+            $consumer->sendMonitoringLog("❌ CompanyConsumer kon niet starten: " . $e->getMessage(), "error");
+        }
+        exit(1);
+    }
 }

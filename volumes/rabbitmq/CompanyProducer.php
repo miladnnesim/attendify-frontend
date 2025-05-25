@@ -12,6 +12,7 @@ use Exception;
 use DateTime;
 use SimpleXMLElement;
 use DOMDocument;
+
 class CompanyProducer {
     private $connection;
     private $channel;
@@ -42,10 +43,11 @@ class CompanyProducer {
         ]);
 
         $routingKey = "company.$operation";
-
         $this->channel->basic_publish($msg, $this->exchange, $routingKey);
 
-        error_log("📤 [Producer] Sent message to RabbitMQ with routing key: $routingKey");
+        $logMsg = "📤 [Producer] Sent message to RabbitMQ with routing key: $routingKey";
+        error_log($logMsg);
+        $this->sendMonitoringLog($logMsg, "info");
     }
 
     private function buildXML(array $data, string $operation): string {
@@ -90,6 +92,28 @@ class CompanyProducer {
         }
 
         return $xml->asXML();
+    }
+
+    private function sendMonitoringLog(string $message, string $level = "info") {
+        if (!$this->channel) {
+            error_log("[monitoring.log skipped]: $message");
+            return;
+        }
+        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+        // Tijdens unit tests: skip publish naar monitoring
+        return;
+    }
+        $sender = "frontend-company-producer";
+        $timestamp = date('c');
+        $logXml = "<log>"
+            . "<sender>" . htmlspecialchars($sender) . "</sender>"
+            . "<timestamp>" . htmlspecialchars($timestamp) . "</timestamp>"
+            . "<level>" . htmlspecialchars($level) . "</level>"
+            . "<message>" . htmlspecialchars($message) . "</message>"
+            . "</log>";
+        $amqpMsg = new AMQPMessage($logXml);
+        // Exchange company, routing key monitoring.log
+        $this->channel->basic_publish($amqpMsg, $this->exchange, 'monitoring.log');
     }
 
     public function __destruct() {

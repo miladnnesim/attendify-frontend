@@ -31,6 +31,7 @@ class InvoiceConsumer {
         $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
         $pdo = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->sendMonitoringLog("Verbonden met database", "info");
         error_log("✅ Verbonden met database");
         return $pdo;
     }
@@ -83,6 +84,7 @@ class InvoiceConsumer {
         foreach ($requiredCols as $col) {
             $stmt = $this->db->query("SHOW COLUMNS FROM $table LIKE '$col'");
             if ($stmt->rowCount() === 0) {
+                $this->sendMonitoringLog("❗ Kolom '$col' ontbreekt in '$table'", "error");
                 error_log("❗ Kolom '$col' ontbreekt in '$table'");
             }
         }
@@ -98,6 +100,7 @@ class InvoiceConsumer {
         );
         $channel = $this->connection->channel();
         $channel->basic_qos(null, 1, null);
+        $this->sendMonitoringLog("Verbonden met RabbitMQ", "info");
         error_log("✅ Verbonden met RabbitMQ");
         return $channel;
     }
@@ -105,6 +108,11 @@ class InvoiceConsumer {
     private function consume() {
         foreach ($this->queues as $queue) {
             $this->channel->basic_consume($queue, '', false, false, false, false, [$this, 'handleMessage']);
+            // Zorg dat de queue bestaat
+            
+            $this->channel->queue_declare($queue, false, true, false, false, false, []);
+
+            $this->sendMonitoringLog("Luistert naar queue: $queue", "info");
             error_log("🎧 Luistert naar queue: $queue");
         }
 
@@ -120,6 +128,9 @@ class InvoiceConsumer {
 
             $sender = (string) $xml->info->sender;
             if (strtolower($sender) === 'frontend') {
+                
+                // Negeer berichten van de frontend
+                $this->sendMonitoringLog("ℹ️ Bericht van frontend genegeerd", "info");
                 error_log("ℹ️ Sender is frontend, message genegeerd.");
                 $msg->ack();
                 return;
@@ -137,6 +148,7 @@ class InvoiceConsumer {
 
             $msg->ack();
         } catch (Exception $e) {
+            $this->sendMonitoringLog("❌ Fout bij verwerken bericht: " . $e->getMessage(), "error");
             error_log("[ERROR] " . $e->getMessage());
             $msg->ack();
         }
@@ -161,6 +173,7 @@ class InvoiceConsumer {
             ");
         } elseif ($operation === 'update_event_payment') {
             if (!$exists) {
+                $this->sendMonitoringLog("❌ Geen bestaande betaling voor update ($uid, $event_id");
                 error_log("❌ Geen bestaande betaling voor update ($uid, $event_id)");
                 return;
             }
@@ -174,6 +187,7 @@ class InvoiceConsumer {
             ");
         } elseif ($operation === 'delete_event_payment') {
             if (!$exists) {
+                $this->sendMonitoringLog("❌ Geen bestaande betaling voor delete ($uid, $event_id)");
                 error_log("❌ Geen bestaande betaling voor delete ($uid, $event_id)");
                 return;
             }
@@ -220,6 +234,7 @@ class InvoiceConsumer {
             $tab_id = $check->fetchColumn();
 
             if (!$tab_id) {
+                $this->sendMonitoringLog(("❌ Geen bestaande tab voor $operation ($uid, $event_id)"));
                 error_log("❌ Geen bestaande tab voor $operation ($uid, $event_id)");
                 return;
             }
@@ -237,6 +252,7 @@ class InvoiceConsumer {
                 ]);
                 $this->db->prepare("DELETE FROM tab_items WHERE tab_id = :tab_id")->execute([':tab_id' => $tab_id]);
             } elseif ($operation === 'delete') {
+                $this->sendMonitoringLog(("🔍 Deleting tab with id = $tab_id"));
                 error_log("🔍 Deleting tab with id = $tab_id");
                 $this->db->prepare("DELETE FROM tab_sales WHERE id = :id")->execute([':id' => $tab_id]);
                 return;
@@ -260,6 +276,33 @@ class InvoiceConsumer {
             }
         }
     }
+    private function sendMonitoringLog(string $message, string $level = "info") {
+        // Alleen loggen als de channel bestaat
+        if (!$this->channel) {
+            // Eventueel lokaal loggen
+            error_log("[monitoring.log skipped]: $message");
+            return;
+        }
+        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+        // Tijdens unit tests: skip publish naar monitoring
+        return;
+    }
+
+        $sender = "frontend-invoice-consumer";
+        $timestamp = date('c');
+
+        $logXml = "<log>"
+            . "<sender>" . htmlspecialchars($sender) . "</sender>"
+            . "<timestamp>" . htmlspecialchars($timestamp) . "</timestamp>"
+            . "<level>" . htmlspecialchars($level) . "</level>"
+            . "<message>" . htmlspecialchars($message) . "</message>"
+            . "</log>";
+
+        $amqpMsg = new AMQPMessage($logXml);
+        $this->channel->basic_publish($amqpMsg, 'invoice', 'monitoring.log');
+    }
+
+
 }
 
 if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
