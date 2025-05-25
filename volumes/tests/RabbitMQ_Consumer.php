@@ -1,6 +1,5 @@
 <?php
 namespace Tests;
-
 use App\RabbitMQ_Consumer;
 use PHPUnit\Framework\TestCase;
 use PhpAmqpLib\Message\AMQPMessage;
