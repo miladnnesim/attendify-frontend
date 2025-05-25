@@ -12,8 +12,6 @@ if (!defined('PHPUNIT_RUNNING')) {
     }
 }
 
-
-
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -23,28 +21,28 @@ use Exception;
 use DateTime;
 use SimpleXMLElement;
 use DOMDocument;
+
 class ProducerUser {
     private $channel;
     private $connection;
     private $exchange = 'user-management';
 
-   public function __construct(AMQPChannel $channel = null) {
-    if ($channel) {
-        // 🧪 Tijdens test, een gemockte channel gebruiken
-        $this->channel = $channel;
-    } else {
-        // 🔌 Enkel in productie een echte verbinding maken
-        $this->connection = new AMQPStreamConnection(
+    public function __construct(AMQPChannel $channel = null) {
+        if ($channel) {
+            // 🧪 Tijdens test, een gemockte channel gebruiken
+            $this->channel = $channel;
+        } else {
+            // 🔌 Enkel in productie een echte verbinding maken
+            $this->connection = new AMQPStreamConnection(
                 'rabbitmq',
                 getenv('RABBITMQ_AMQP_PORT'),
                 getenv('RABBITMQ_HOST'),
                 getenv('RABBITMQ_PASSWORD'),
                 getenv('RABBITMQ_USER')
             );
-        $this->channel = $this->connection->channel();
+            $this->channel = $this->connection->channel();
+        }
     }
-}
-
 
     public function sendUserData($user_id, $operation = 'create') {
         global $wpdb;
@@ -101,20 +99,24 @@ class ProducerUser {
         $city        = $um_data['city']          ?? get_user_meta($user_id, 'city', true);
         $province    = $um_data['province']      ?? get_user_meta($user_id, 'province', true);
         $country     = $um_data['user_country']  ?? get_user_meta($user_id, 'user_country', true);
-        $company_uid = $um_data['company_vat_number'] ?? get_user_meta($user_id, 'company_vat_number', true); // 💡 company UID
+        $company_uid = $um_data['company_vat_number'] ?? get_user_meta($user_id, 'company_vat_number', true);
 
         // ✅ Company-link check
-        if ($company_uid !== $old_company_vat_number&&! defined('PHPUNIT_RUNNING')) {
+        if ($company_uid !== $old_company_vat_number && !defined('PHPUNIT_RUNNING')) {
             require_once __DIR__ . '/UserCompanyLinkProducer.php';
 
             if (!empty($old_company_vat_number)) {
                 sendUserCompanyLink($customUserId, $old_company_vat_number, 'unregister');
-                error_log("❌ Ontkoppeld: user {$customUserId} van oud bedrijf {$old_company_vat_number}");
+                $msg = "❌ Ontkoppeld: user {$customUserId} van oud bedrijf {$old_company_vat_number}";
+                error_log($msg);
+                $this->sendMonitoringLog($msg, "info");
             }
 
             if (!empty($company_uid)) {
                 sendUserCompanyLink($customUserId, $company_uid, 'register');
-                error_log("✅ Gekoppeld: user {$customUserId} aan nieuw bedrijf {$company_uid}");
+                $msg = "✅ Gekoppeld: user {$customUserId} aan nieuw bedrijf {$company_uid}";
+                error_log($msg);
+                $this->sendMonitoringLog($msg, "info");
                 update_user_meta($user_id, 'old_company_vat_number', $company_uid);
             } else {
                 delete_user_meta($user_id, 'old_company_vat_number');
@@ -142,12 +144,18 @@ class ProducerUser {
         $last_hash = get_transient($transient_key);
 
         if ($last_hash === $hash) {
-            error_log("Overslaan van dubbele boodschap voor gebruiker $user_id met operatie $operation");
+            $msg = "Overslaan van dubbele boodschap voor gebruiker $user_id met operatie $operation";
+            error_log($msg);
+            $this->sendMonitoringLog($msg, "info");
             return;
         }
 
         $msg = new AMQPMessage($xml_message);
         $this->channel->basic_publish($msg, $this->exchange, $routing_key);
+
+        $logMsg = "📤 [ProducerUser] Sent message for user_id=$user_id with routing key: $routing_key";
+        error_log($logMsg);
+        $this->sendMonitoringLog($logMsg, "info");
 
         set_transient($transient_key, $hash, 5);
     }
@@ -212,13 +220,29 @@ class ProducerUser {
         return $dom->saveXML();
     }
 
+    private function sendMonitoringLog(string $message, string $level = "info") {
+        if (!$this->channel) {
+            error_log("[monitoring.log skipped]: $message");
+            return;
+        }
+        $sender = "frontend-user-producer";
+        $timestamp = date('c');
+        $logXml = "<log>"
+            . "<sender>" . htmlspecialchars($sender) . "</sender>"
+            . "<timestamp>" . htmlspecialchars($timestamp) . "</timestamp>"
+            . "<level>" . htmlspecialchars($level) . "</level>"
+            . "<message>" . htmlspecialchars($message) . "</message>"
+            . "</log>";
+        $amqpMsg = new AMQPMessage($logXml);
+        $this->channel->basic_publish($amqpMsg, $this->exchange, 'monitoring.log');
+    }
+
     public function __destruct() {
         if ($this->channel) $this->channel->close();
         if ($this->connection) $this->connection->close();
     }
 }
 
-// For manual testing
 // For manual testing (NIET tijdens PHPUnit)
 if (php_sapi_name() === 'cli' && ! defined('PHPUNIT_RUNNING')) {
     $user_id   = $argv[1] ?? 1;
@@ -226,4 +250,3 @@ if (php_sapi_name() === 'cli' && ! defined('PHPUNIT_RUNNING')) {
     $producer  = new ProducerUser();
     $producer->sendUserData($user_id, $operation);
 }
-

@@ -17,8 +17,6 @@ function sendRegistrationMessage($type, $user_id, $entity_id, $operation = 'regi
     $producer->sendRegistrationMessage($type, $user_id, $entity_id, $operation);
 }
 
-
-
 class RegistrationMessageProducer {
     private $channel;
     private $connection;
@@ -61,8 +59,8 @@ class RegistrationMessageProducer {
               </event_attendee>
             </attendify>
             XML;
-                    } else { // $type === 'session'
-                        $xml = <<<XML
+        } else { // $type === 'session'
+            $xml = <<<XML
             <attendify>
               <info>
                 <operation>$operation</operation>
@@ -82,7 +80,26 @@ class RegistrationMessageProducer {
         ]);
 
         $this->channel->basic_publish($msg, $exchange, $routing_key);
-        error_log("📤 [$operation] gestuurd voor $type '$entity_id' van user '$user_id'");
+        $logMsg = "📤 [$operation] gestuurd voor $type '$entity_id' van user '$user_id'";
+        error_log($logMsg);
+        $this->sendMonitoringLog($logMsg, "info");
+    }
+
+    private function sendMonitoringLog(string $message, string $level = "info") {
+        if (!$this->channel) {
+            error_log("[monitoring.log skipped]: $message");
+            return;
+        }
+        $sender = "frontend-registration-producer";
+        $timestamp = date('c');
+        $logXml = "<log>"
+            . "<sender>" . htmlspecialchars($sender) . "</sender>"
+            . "<timestamp>" . htmlspecialchars($timestamp) . "</timestamp>"
+            . "<level>" . htmlspecialchars($level) . "</level>"
+            . "<message>" . htmlspecialchars($message) . "</message>"
+            . "</log>";
+        $amqpMsg = new AMQPMessage($logXml);
+        $this->channel->basic_publish($amqpMsg, 'event', 'monitoring.log');
     }
 
     public function __destruct() {
