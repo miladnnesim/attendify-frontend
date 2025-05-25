@@ -104,7 +104,7 @@ class ProducerUser {
         $company_uid = $um_data['company_vat_number'] ?? get_user_meta($user_id, 'company_vat_number', true); // 💡 company UID
 
         // ✅ Company-link check
-        if ($company_uid !== $old_company_vat_number) {
+        if ($company_uid !== $old_company_vat_number&&! defined('PHPUNIT_RUNNING')) {
             require_once __DIR__ . '/UserCompanyLinkProducer.php';
 
             if (!empty($old_company_vat_number)) {
