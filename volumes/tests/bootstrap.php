@@ -1,11 +1,9 @@
 <?php
-namespace App;
 
 // dit is je PHPUnit-bootstrap
 
 // 1️⃣ laad je Composer-autoloader
 require_once __DIR__ . '/../vendor/autoload.php';
-use App\sendUserCompanyLink;
 // 2️⃣ definieer WP-stubs, maar alleen als ze nog niet bestaan
 if (! function_exists('get_userdata')) {
     function get_userdata($id) {
