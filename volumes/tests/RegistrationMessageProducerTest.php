@@ -1,4 +1,5 @@
 <?php
+namespace Tests;
 use PHPUnit\Framework\TestCase;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
