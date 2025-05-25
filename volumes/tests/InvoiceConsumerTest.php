@@ -9,8 +9,8 @@ class InvoiceConsumerTest extends TestCase {
     private $consumer;
 
     protected function setUp(): void {
-        $this->pdo = new PDO('sqlite::memory:');
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->pdo = new \PDO('sqlite::memory:');
+        $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         $this->pdo->exec("CREATE TABLE event_payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +63,7 @@ XML;
         $this->consumer->handleMessage($msg);
 
         $stmt = $this->pdo->query("SELECT * FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         $this->assertNotEmpty($row);
         $this->assertEquals(12.5, $row['entrance_fee']);
@@ -95,7 +95,7 @@ XML;
     $this->consumer->handleMessage($msg);
 
     $stmt = $this->pdo->query("SELECT * FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
     $this->assertEquals(15.5, $row['entrance_fee']);
     $this->assertEquals(1, $row['entrance_paid']);
@@ -150,11 +150,11 @@ XML;
     $msg = new AMQPMessage($xml);
     $this->consumer->handleMessage($msg);
 
-    $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE uid = 'u1' AND event_id = 'e99'")->fetch(PDO::FETCH_ASSOC);
+    $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE uid = 'u1' AND event_id = 'e99'")->fetch(\PDO::FETCH_ASSOC);
     $this->assertNotEmpty($sale);
     $this->assertEquals(1, $sale['is_paid']);
 
-    $items = $this->pdo->query("SELECT * FROM tab_items WHERE tab_id = {$sale['id']}")->fetchAll(PDO::FETCH_ASSOC);
+    $items = $this->pdo->query("SELECT * FROM tab_items WHERE tab_id = {$sale['id']}")->fetchAll(\PDO::FETCH_ASSOC);
     $this->assertCount(1, $items);
     $this->assertEquals('Cola', $items[0]['item_name']);
 }
@@ -188,11 +188,11 @@ XML;
     $msg = new AMQPMessage($xml);
     $this->consumer->handleMessage($msg);
 
-    $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+    $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE id = 1")->fetch(\PDO::FETCH_ASSOC);
     $this->assertEquals(1, $sale['is_paid']);
     $this->assertEquals('2025-05-25 18:00:00', $sale['timestamp']);
 
-    $items = $this->pdo->query("SELECT * FROM tab_items WHERE tab_id = 1")->fetchAll(PDO::FETCH_ASSOC);
+    $items = $this->pdo->query("SELECT * FROM tab_items WHERE tab_id = 1")->fetchAll(\PDO::FETCH_ASSOC);
     $this->assertCount(1, $items);
     $this->assertEquals('Fanta', $items[0]['item_name']);
 }
