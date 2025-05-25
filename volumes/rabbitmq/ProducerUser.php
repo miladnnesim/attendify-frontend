@@ -35,12 +35,12 @@ class ProducerUser {
     } else {
         // 🔌 Enkel in productie een echte verbinding maken
         $this->connection = new AMQPStreamConnection(
-            'rabbitmq',
-            getenv('RABBITMQ_AMQP_PORT') ?: 5672,
-            getenv('RABBITMQ_USER') ?: 'guest',
-            getenv('RABBITMQ_PASSWORD') ?: 'guest',
-            getenv('RABBITMQ_VHOST') ?: '/'
-        );
+                'rabbitmq',
+                getenv('RABBITMQ_AMQP_PORT'),
+                getenv('RABBITMQ_HOST'),
+                getenv('RABBITMQ_PASSWORD'),
+                getenv('RABBITMQ_USER')
+            );
         $this->channel = $this->connection->channel();
     }
 }

@@ -288,7 +288,7 @@ function save_custom_fields_in_account($changes, $user_id) {
 function send_user_data_to_rabbitmq_create($user_id, $args) {
     sleep(2); // wacht 2 seconden
     try {
-        $producer = new Producer();
+        $producer = new \App\ProducerUser();
         $producer->sendUserData($user_id, 'create');
     } catch (Exception $e) {
         error_log("Failed to send user data to RabbitMQ (create): " . $e->getMessage());
@@ -298,7 +298,7 @@ add_action('um_registration_complete', 'send_user_data_to_rabbitmq_create', 10, 
 // Hook into user update (voor update)
 function send_user_data_to_rabbitmq_update($user_id, $old_data) {
     try {
-        $producer = new Producer();
+        $producer = new \App\ProducerUser();
         $producer->sendUserData($user_id, 'update');
     } catch (Exception $e) {
         error_log("Failed to send user data to RabbitMQ (update): " . $e->getMessage());
@@ -312,7 +312,7 @@ add_action('profile_update', 'send_user_data_to_rabbitmq_update', 10, 2);
 // Hook into user deletion (voor delete)
 function send_user_delete_to_rabbitmq($user_id) {
     try {
-        $producer = new Producer();
+        $producer = new \App\ProducerUser();
         $producer->sendUserData($user_id, 'delete');
     } catch (Exception $e) {
         error_log("Failed to send user data to RabbitMQ (delete): " . $e->getMessage());
@@ -790,10 +790,10 @@ add_action('init', function () {
 
         try {
             if ($session_uid) {
-                sendRegistrationMessage('session', $uid, $session_uid, 'unregister');
+                \App\sendRegistrationMessage('session', $uid, $session_uid, 'unregister');
                 wp_redirect(add_query_arg('unregistered', 'session', wp_get_referer()));
             } elseif ($event_uid) {
-                sendRegistrationMessage('event', $uid, $event_uid, 'unregister');
+                \App\sendRegistrationMessage('event', $uid, $event_uid, 'unregister');
                 wp_redirect(add_query_arg('unregistered', 'event', wp_get_referer()));
             } else {
                 wp_die('Ongeldige annuleringsgegevens.');
@@ -824,10 +824,10 @@ add_action('init', function () {
 
         try {
             if ($session_uid) {
-                sendRegistrationMessage('session', $uid, $session_uid); // ✅ goed
+                \App\sendRegistrationMessage('session', $uid, $session_uid); // ✅ goed
                 wp_redirect(add_query_arg('registered', 'session', wp_get_referer()));
             } elseif ($event_uid) {
-                sendRegistrationMessage('event', $uid, $event_uid); // ✅ goed
+                \App\sendRegistrationMessage('event', $uid, $event_uid); // ✅ goed
                 // Tijdzone correct instellen
                 date_default_timezone_set('Europe/Brussels');
 

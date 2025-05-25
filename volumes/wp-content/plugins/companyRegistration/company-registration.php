@@ -256,10 +256,10 @@ input[type="radio"] {
         $success = $inserted !== false;
 
         if ($success) {
-            $producer = new CompanyProducer();
+            $producer = new \App\CompanyProducer();
             $producer->sendCompanyData($company_data, 'create');
             require_once plugin_dir_path(__FILE__) . '../../../rabbitmq/UserCompanyLinkProducer.php';
-            sendUserCompanyLink($owner_id, $uid, 'register');
+            \App\sendUserCompanyLink($owner_id, $uid, 'register');
 
             echo '<div class="alert alert-success">The company has been registered successfully.</div>';
         } else {
@@ -285,7 +285,7 @@ function show_user_companies() {
 
     $current_user = wp_get_current_user();
     $owner_uid = get_user_meta($current_user->ID, 'uid', true);
-    $producer = new CompanyProducer();
+    $producer = new \App\CompanyProducer();
 
     // Handle update
     if (isset($_POST['update_uid'])) {
