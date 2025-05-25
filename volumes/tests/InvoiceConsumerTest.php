@@ -61,7 +61,7 @@ class InvoiceConsumerTest extends TestCase {
   </event_payment>
 </attendify>
 XML;
-        $msg = new AMQPMessage($xml);
+        $msg = new FakeAMQPMessage($xml);
         $this->consumer->handleMessage($msg);
 
         $stmt = $this->pdo->query("SELECT * FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
@@ -93,7 +93,7 @@ public function testHandleEventPaymentUpdate(): void {
 </attendify>
 XML;
 
-    $msg = new AMQPMessage($xml);
+    $msg = new FakeAMQPMessage($xml);
     $this->consumer->handleMessage($msg);
 
     $stmt = $this->pdo->query("SELECT * FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
@@ -120,7 +120,7 @@ public function testHandleEventPaymentDelete(): void {
 </attendify>
 XML;
 
-    $msg = new AMQPMessage($xml);
+    $msg = new FakeAMQPMessage($xml);
     $this->consumer->handleMessage($msg);
 
     $stmt = $this->pdo->query("SELECT COUNT(*) FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
@@ -149,7 +149,7 @@ public function testHandleTabCreate(): void {
 </attendify>
 XML;
 
-    $msg = new AMQPMessage($xml);
+    $msg = new FakeAMQPMessage($xml);
     $this->consumer->handleMessage($msg);
 
     $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE uid = 'u1' AND event_id = 'e99'")->fetch(\PDO::FETCH_ASSOC);
@@ -187,7 +187,7 @@ public function testHandleTabUpdate(): void {
 </attendify>
 XML;
 
-    $msg = new AMQPMessage($xml);
+    $msg = new FakeAMQPMessage($xml);
     $this->consumer->handleMessage($msg);
 
     $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE id = 1")->fetch(\PDO::FETCH_ASSOC);
@@ -215,7 +215,7 @@ public function testHandleTabDelete(): void {
 </attendify>
 XML;
 
-    $msg = new AMQPMessage($xml);
+    $msg = new FakeAMQPMessage($xml);
     $this->consumer->handleMessage($msg);
 
     $count = $this->pdo->query("SELECT COUNT(*) FROM tab_sales WHERE id = 1")->fetchColumn();
@@ -224,4 +224,9 @@ XML;
     $items = $this->pdo->query("SELECT COUNT(*) FROM tab_items WHERE tab_id = 1")->fetchColumn();
     $this->assertEquals(0, $items);
 }
+}
+class FakeAMQPMessage extends \PhpAmqpLib\Message\AMQPMessage {
+    public function ack(): void {
+        // Ignorer ack pendant les tests
+    }
 }
