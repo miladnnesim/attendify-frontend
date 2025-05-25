@@ -11,22 +11,27 @@ if (!function_exists('get_userdata')) {
 
 require_once __DIR__ . '/../vendor/autoload.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
+use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
 
 class Producer {
-    private $connection;
     private $channel;
+    private $connection;
     private $exchange = 'user-management';
 
-    public function __construct() {
-        $this->connection = new AMQPStreamConnection(
-            'rabbitmq',
-            getenv('RABBITMQ_AMQP_PORT'),
-            getenv('RABBITMQ_HOST'),
-            getenv('RABBITMQ_PASSWORD'),
-            getenv('RABBITMQ_USER')
-        );
-        $this->channel = $this->connection->channel();
+    public function __construct(AMQPChannel $channel = null) {
+        if ($channel) {
+            $this->channel = $channel;
+        } else {
+            $this->connection = new AMQPStreamConnection(
+                'rabbitmq',
+                getenv('RABBITMQ_AMQP_PORT'),
+                getenv('RABBITMQ_HOST'),
+                getenv('RABBITMQ_PASSWORD'),
+                getenv('RABBITMQ_USER')
+            );
+            $this->channel = $this->connection->channel();
+        }
     }
 
     public function sendUserData($user_id, $operation = 'create') {
@@ -104,64 +109,20 @@ class Producer {
             }
         }
 
-        // XML opbouwen
-        $xml = new SimpleXMLElement('<attendify/>');
-        $info = $xml->addChild('info');
-        $info->addChild('sender', 'frontend');
-        $info->addChild('operation', $operation);
-
-        $user_node = $xml->addChild('user');
-        $user_node->addChild('uid', $customUserId);
-        $user_node->addChild('first_name', htmlspecialchars($first_name));
-        $user_node->addChild('last_name', htmlspecialchars($last_name));
-        $user_node->addChild('date_of_birth', htmlspecialchars($birth_date));
-        $user_node->addChild('phone_number', htmlspecialchars($phone_number));
-        $user_node->addChild('title', htmlspecialchars($title));
-        $user_node->addChild('email', htmlspecialchars($user->user_email));
-        $user_node->addChild('password', htmlspecialchars($user->user_pass));
-
-        $address = $user_node->addChild('address');
-        $address->addChild('street', htmlspecialchars($street));
-        $address->addChild('number', '');
-        $address->addChild('bus_number', htmlspecialchars($bus_number));
-        $address->addChild('city', htmlspecialchars($city));
-        $address->addChild('province', htmlspecialchars($province));
-        $address->addChild('country', htmlspecialchars($country));
-        $address->addChild('postal_code', '');
-
-        $payment_details = $user_node->addChild('payment_details');
-        $facturation_address = $payment_details->addChild('facturation_address');
-        $facturation_address->addChild('street', htmlspecialchars($street));
-        $facturation_address->addChild('number', '');
-        $facturation_address->addChild('company_bus_number', htmlspecialchars($bus_number));
-        $facturation_address->addChild('city', htmlspecialchars($city));
-        $facturation_address->addChild('province', htmlspecialchars($province));
-        $facturation_address->addChild('country', htmlspecialchars($country));
-        $facturation_address->addChild('postal_code', '');
-        $payment_details->addChild('payment_method', '');
-        $payment_details->addChild('card_number', '');
-
-        $user_node->addChild('email_registered', 'true');
-
-        $company = $user_node->addChild('company');
-        $company->addChild('id', '');
-        $company->addChild('name', '');
-        $company->addChild('VAT_number', htmlspecialchars($company_uid));
-        $company_address = $company->addChild('address');
-        $company_address->addChild('street', '');
-        $company_address->addChild('number', '');
-        $company_address->addChild('city', '');
-        $company_address->addChild('province', '');
-        $company_address->addChild('country', '');
-        $company_address->addChild('postal_code', '');
-
-        $user_node->addChild('from_company', 'false');
-
-        $dom = new DOMDocument('1.0');
-        $dom->preserveWhiteSpace = false;
-        $dom->formatOutput = true;
-        $dom->loadXML($xml->asXML());
-        $xml_message = $dom->saveXML();
+        $xml_message = $this->buildUserXml($customUserId, $user, [
+            'first_name' => $first_name,
+            'last_name' => $last_name,
+            'birth_date' => $birth_date,
+            'phone_number' => $phone_number,
+            'title' => $title,
+            'street' => $street,
+            'bus_number' => $bus_number,
+            'city' => $city,
+            'province' => $province,
+            'country' => $country,
+            'company_uid' => $company_uid,
+            'password' => $user->user_pass,
+        ], $operation);
 
         // Dubbele boodschap check
         $hash = md5($xml_message);
@@ -179,9 +140,69 @@ class Producer {
         set_transient($transient_key, $hash, 5);
     }
 
+    public function buildUserXml($uid, $user, array $data, string $operation): string {
+        $xml = new SimpleXMLElement('<attendify/>');
+        $info = $xml->addChild('info');
+        $info->addChild('sender', 'frontend');
+        $info->addChild('operation', $operation);
+
+        $user_node = $xml->addChild('user');
+        $user_node->addChild('uid', $uid);
+        $user_node->addChild('first_name', htmlspecialchars($data['first_name']));
+        $user_node->addChild('last_name', htmlspecialchars($data['last_name']));
+        $user_node->addChild('date_of_birth', htmlspecialchars($data['birth_date']));
+        $user_node->addChild('phone_number', htmlspecialchars($data['phone_number']));
+        $user_node->addChild('title', htmlspecialchars($data['title']));
+        $user_node->addChild('email', htmlspecialchars($user->user_email));
+        $user_node->addChild('password', htmlspecialchars($data['password']));
+
+        $address = $user_node->addChild('address');
+        $address->addChild('street', htmlspecialchars($data['street']));
+        $address->addChild('number', '');
+        $address->addChild('bus_number', htmlspecialchars($data['bus_number']));
+        $address->addChild('city', htmlspecialchars($data['city']));
+        $address->addChild('province', htmlspecialchars($data['province']));
+        $address->addChild('country', htmlspecialchars($data['country']));
+        $address->addChild('postal_code', '');
+
+        $payment_details = $user_node->addChild('payment_details');
+        $facturation_address = $payment_details->addChild('facturation_address');
+        $facturation_address->addChild('street', htmlspecialchars($data['street']));
+        $facturation_address->addChild('number', '');
+        $facturation_address->addChild('company_bus_number', htmlspecialchars($data['bus_number']));
+        $facturation_address->addChild('city', htmlspecialchars($data['city']));
+        $facturation_address->addChild('province', htmlspecialchars($data['province']));
+        $facturation_address->addChild('country', htmlspecialchars($data['country']));
+        $facturation_address->addChild('postal_code', '');
+        $payment_details->addChild('payment_method', '');
+        $payment_details->addChild('card_number', '');
+
+        $user_node->addChild('email_registered', 'true');
+
+        $company = $user_node->addChild('company');
+        $company->addChild('id', '');
+        $company->addChild('name', '');
+        $company->addChild('VAT_number', htmlspecialchars($data['company_uid']));
+        $company_address = $company->addChild('address');
+        $company_address->addChild('street', '');
+        $company_address->addChild('number', '');
+        $company_address->addChild('city', '');
+        $company_address->addChild('province', '');
+        $company_address->addChild('country', '');
+        $company_address->addChild('postal_code', '');
+
+        $user_node->addChild('from_company', 'false');
+
+        $dom = new DOMDocument('1.0');
+        $dom->preserveWhiteSpace = false;
+        $dom->formatOutput = true;
+        $dom->loadXML($xml->asXML());
+        return $dom->saveXML();
+    }
+
     public function __destruct() {
-        $this->channel->close();
-        $this->connection->close();
+        if ($this->channel) $this->channel->close();
+        if ($this->connection) $this->connection->close();
     }
 }
 

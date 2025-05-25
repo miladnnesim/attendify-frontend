@@ -4,6 +4,7 @@ require_once '/var/www/html/vendor/autoload.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Exception\AMQPIOException;
+use PhpAmqpLib\Channel\AMQPChannel;
 
 class UnifiedConsumer {
     private $connection;
@@ -11,19 +12,20 @@ class UnifiedConsumer {
     private $db;
     private $queue = 'frontend.event';
 
-    public function __construct() {
-        $this->connectToDB();
+    public function __construct(?PDO $db = null, ?AMQPChannel $channel = null) {
+        $this->db = $db ?? $this->connectToDB();
         $this->initTables();
-        $this->connectToRabbitMQ();
+        $this->channel = $channel ?? $this->connectToRabbitMQ();
         $this->processMessages();
     }
 
-    private function connectToDB() {
+    private function connectToDB(): PDO {
         try {
             $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
-            $this->db = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
-            $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $pdo = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
+            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             error_log("✅ Connected to database");
+            return $pdo;
         } catch (PDOException $e) {
             error_log("❌ Database connection failed: " . $e->getMessage());
             exit(1);
@@ -31,13 +33,11 @@ class UnifiedConsumer {
     }
 
     private function initTables() {
-        // Table: user_event
         $this->initTable('user_event', [
             'user_id' => 'VARCHAR(255)',
             'event_id' => 'VARCHAR(255)'
         ], ['user_id', 'event_id']);
 
-        // Table: user_session
         $this->initTable('user_session', [
             'user_id' => 'VARCHAR(255)',
             'session_id' => 'VARCHAR(255)'
@@ -103,7 +103,7 @@ class UnifiedConsumer {
         }
     }
 
-    private function connectToRabbitMQ() {
+    private function connectToRabbitMQ(): AMQPChannel {
         $maxRetries = 5;
         $retryDelay = 3;
         for ($i = 0; $i < $maxRetries; $i++) {
@@ -113,12 +113,12 @@ class UnifiedConsumer {
                     getenv('RABBITMQ_AMQP_PORT') ?: 5672,
                     getenv('RABBITMQ_HOST'),
                     getenv('RABBITMQ_PASSWORD'),
-                    getenv('RABBITMQ_USER') 
+                    getenv('RABBITMQ_USER')
                 );
-                $this->channel = $this->connection->channel();
-                $this->channel->basic_qos(null, 1, null);
+                $channel = $this->connection->channel();
+                $channel->basic_qos(null, 1, null);
                 error_log("✅ Connected to RabbitMQ");
-                return;
+                return $channel;
             } catch (AMQPIOException $e) {
                 if ($i === $maxRetries - 1) {
                     error_log("❌ RabbitMQ connection failed: " . $e->getMessage());
@@ -139,15 +139,9 @@ class UnifiedConsumer {
                 $operation = (string)$xml->info->operation;
 
                 if (isset($xml->event_attendee)) {
-                    $user_id = trim((string)$xml->event_attendee->uid);
-                    $event_id = trim((string)$xml->event_attendee->event_id);
-                    if (!$user_id || !$event_id) throw new Exception("user_id or event_id missing");
-                    $this->processRegistration('event', $operation, $user_id, $event_id);
+                    $this->processRegistration('event', $operation, trim((string)$xml->event_attendee->uid), trim((string)$xml->event_attendee->event_id));
                 } elseif (isset($xml->session_attendee)) {
-                    $user_id = trim((string)$xml->session_attendee->uid);
-                    $session_id = trim((string)$xml->session_attendee->session_id);
-                    if (!$user_id || !$session_id) throw new Exception("user_id or session_id missing");
-                    $this->processRegistration('session', $operation, $user_id, $session_id);
+                    $this->processRegistration('session', $operation, trim((string)$xml->session_attendee->uid), trim((string)$xml->session_attendee->session_id));
                 } elseif (isset($xml->event)) {
                     $this->handleEvent($xml->event, $operation);
                 } elseif (isset($xml->session)) {
@@ -159,13 +153,13 @@ class UnifiedConsumer {
                 $msg->ack();
             } catch (Exception $e) {
                 error_log("[ERROR] " . $e->getMessage());
-                $msg->ack(); // Acknowledge to avoid requeueing, as per RegistrationConsumer behavior
+                $msg->ack();
             }
         };
 
         $queues = ['frontend.event', 'frontend.session'];
         foreach ($queues as $queue) {
-        $this->channel->basic_consume($queue, '', false, false, false, false, $callback);
+            $this->channel->basic_consume($queue, '', false, false, false, false, $callback);
         }
 
         while ($this->channel->is_consuming()) {

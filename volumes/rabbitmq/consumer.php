@@ -4,7 +4,8 @@ require_once '/var/www/html/vendor/autoload.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Exception\AMQPIOException;
- 
+use PhpAmqpLib\Channel\AMQPChannel;
+
 class RabbitMQ_Consumer {
     private $connection;
     private $channel;
@@ -13,48 +14,49 @@ class RabbitMQ_Consumer {
     private $queue = 'frontend.user';
     private $table_prefix = 'wp';
  
-    public function __construct() {
-        $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
-        try {
-            $this->db = new PDO($dsn, getenv('LOCAL_DB_USER'), getenv('LOCAL_DB_PASSWORD'));
-            $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            error_log("Successfully connected to database");
-        } catch (PDOException $e) {
-            error_log("Failed to connect to database: " . $e->getMessage());
-            exit(1);
-        }
- 
-        $this->connectRabbitMQ();
+    public function __construct(?PDO $db = null, ?AMQPChannel $channel = null) {
+        $this->db = $db ?? $this->createDbConnection();
+        $this->channel = $channel ?? $this->connectRabbitMQ();
+    }
+
+    public function run(): void {
         $this->setupQueue();
         $this->processMessages();
     }
-   
- 
-    private function connectRabbitMQ() {
+
+    private function createDbConnection(): PDO {
+        $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
+        $pdo = new PDO($dsn, getenv('LOCAL_DB_USER'), getenv('LOCAL_DB_PASSWORD'));
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        error_log("Successfully connected to database");
+        return $pdo;
+    }
+
+    private function connectRabbitMQ(): AMQPChannel {
         $maxRetries = 5;
         $retryDelay = 3;
- 
         for ($i = 0; $i < $maxRetries; $i++) {
             try {
                 $this->connection = new AMQPStreamConnection(
-                    'rabbitmq', # naam container
+                    'rabbitmq',
                     getenv('RABBITMQ_AMQP_PORT'),
                     getenv('RABBITMQ_HOST'),
-                    getenv('RABBITMQ_PASSWORD'),# mogelijk dat de host en user door elkaar zijn
+                    getenv('RABBITMQ_PASSWORD'),
                     getenv('RABBITMQ_USER')
                 );
-                $this->channel = $this->connection->channel();
+                $channel = $this->connection->channel();
                 error_log("Successfully connected to RabbitMQ");
-                return;
+                return $channel;
             } catch (AMQPIOException $e) {
                 if ($i === $maxRetries - 1) {
-                    error_log("Kon geen verbinding maken met RabbitMQ: " . $e->getMessage());
+                    error_log("RabbitMQ connection failed: " . $e->getMessage());
                     throw $e;
                 }
                 error_log("Retrying RabbitMQ connection ($i/$maxRetries)...");
                 sleep($retryDelay);
             }
         }
+        throw new Exception("Failed to connect to RabbitMQ after retries");
     }
  
     private function setupQueue() {
@@ -483,7 +485,8 @@ class RabbitMQ_Consumer {
  
  
 try {
-    new RabbitMQ_Consumer();
+    $consumer = new RabbitMQ_Consumer();
+    $consumer->run();
 } catch (Exception $e) {
     error_log("Consumer failed to start: " . $e->getMessage());
     exit(1);

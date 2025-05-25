@@ -3,6 +3,7 @@ require_once '/var/www/html/vendor/autoload.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
+use PhpAmqpLib\Channel\AMQPChannel;
 
 class InvoiceConsumer {
     private $connection;
@@ -10,18 +11,22 @@ class InvoiceConsumer {
     private $db;
     private $queues = ['frontend.invoice', 'frontend.sale'];
 
-    public function __construct() {
-        $this->connectToDB();
+    public function __construct(?PDO $db = null, ?AMQPChannel $channel = null) {
+        $this->db = $db ?? $this->createDbConnection();
+        $this->channel = $channel ?? $this->connectToRabbitMQ();
+    }
+
+    public function run(): void {
         $this->initTables();
-        $this->connectToRabbitMQ();
         $this->consume();
     }
 
-    private function connectToDB() {
+    private function createDbConnection(): PDO {
         $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
-        $this->db = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
-        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         error_log("✅ Verbonden met database");
+        return $pdo;
     }
 
     private function initTables() {
@@ -78,7 +83,7 @@ class InvoiceConsumer {
         }
     }
 
-    private function connectToRabbitMQ() {
+    private function connectToRabbitMQ(): AMQPChannel {
         $this->connection = new AMQPStreamConnection(
             'rabbitmq',
             getenv('RABBITMQ_AMQP_PORT') ?: 5672,
@@ -86,10 +91,12 @@ class InvoiceConsumer {
             getenv('RABBITMQ_PASSWORD') ?: 'guest',
             getenv('RABBITMQ_USER') ?: 'guest'
         );
-        $this->channel = $this->connection->channel();
-        $this->channel->basic_qos(null, 1, null);
-        error_log("✅ Verbonden met RabbitMQ (queue: {$this->queue})");
+        $channel = $this->connection->channel();
+        $channel->basic_qos(null, 1, null);
+        error_log("✅ Verbonden met RabbitMQ");
+        return $channel;
     }
+
     private function consume() {
         foreach ($this->queues as $queue) {
             $this->channel->basic_consume($queue, '', false, false, false, false, [$this, 'handleMessage']);
@@ -255,7 +262,8 @@ class InvoiceConsumer {
 }
 
 try {
-    new InvoiceConsumer();
+    $consumer = new InvoiceConsumer();
+    $consumer->run();
 } catch (Exception $e) {
     error_log("❌ InvoiceConsumer kon niet starten: " . $e->getMessage());
     exit(1);

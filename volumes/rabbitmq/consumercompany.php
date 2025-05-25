@@ -2,6 +2,7 @@
 require_once '/var/www/html/vendor/autoload.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
+use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Message\AMQPMessage;
 
 class CompanyConsumer {
@@ -11,21 +12,39 @@ class CompanyConsumer {
     private $queue = 'frontend.company';
     private $table_prefix = 'wp';
 
-    public function __construct() {
-        $this->connectToDB();
+    public function __construct(?PDO $db = null, ?AMQPChannel $channel = null) {
+        $this->db = $db ?? $this->createDbConnection();
+        $this->channel = $channel ?? $this->connectToRabbitMQ();
+    }
+
+    public function run(): void {
         $this->initTables();
-        $this->connectToRabbitMQ();
         $this->consume();
     }
 
-    private function connectToDB() {
+    private function createDbConnection(): PDO {
         $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
-        $this->db = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
-        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         error_log("✅ Verbonden met database");
+        return $pdo;
     }
 
-    private function initTables() {
+    private function connectToRabbitMQ(): AMQPChannel {
+        $this->connection = new AMQPStreamConnection(
+            'rabbitmq',
+            getenv('RABBITMQ_AMQP_PORT') ?: 5672,
+            getenv('RABBITMQ_HOST') ?: 'guest',
+            getenv('RABBITMQ_PASSWORD') ?: 'guest',
+            getenv('RABBITMQ_USER') ?: 'guest'
+        );
+        $channel = $this->connection->channel();
+        $channel->basic_qos(null, 1, null);
+        error_log("✅ Verbonden met RabbitMQ");
+        return $channel;
+    }
+
+    public function initTables(): void {
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS companies (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -49,7 +68,7 @@ class CompanyConsumer {
             'billing_city' => 'VARCHAR(255)',
             'email' => 'VARCHAR(255)',
             'phone' => 'VARCHAR(50)',
-            'owner_id' => 'VARCHAR(30)' // ✅ toegevoegd
+            'owner_id' => 'VARCHAR(30)'
         ];
 
         foreach ($columns as $col => $type) {
@@ -61,20 +80,7 @@ class CompanyConsumer {
         }
     }
 
-    private function connectToRabbitMQ() {
-        $this->connection = new AMQPStreamConnection(
-            'rabbitmq',
-            getenv('RABBITMQ_AMQP_PORT') ?: 5672,
-            getenv('RABBITMQ_HOST') ?: 'guest',
-            getenv('RABBITMQ_PASSWORD') ?: 'guest',
-            getenv('RABBITMQ_USER') ?: 'guest'
-        );
-        $this->channel = $this->connection->channel();
-        $this->channel->basic_qos(null, 1, null);
-        error_log("✅ Verbonden met RabbitMQ");
-    }
-
-    private function consume() {
+    private function consume(): void {
         $this->channel->basic_consume($this->queue, '', false, false, false, false, [$this, 'handleMessage']);
 
         while ($this->channel->is_consuming()) {
@@ -82,18 +88,15 @@ class CompanyConsumer {
         }
     }
 
-    public function handleMessage(AMQPMessage $msg) {
+    public function handleMessage(AMQPMessage $msg): void {
         try {
             $xml = simplexml_load_string($msg->body);
             if (!$xml) throw new Exception("❌ Ongeldig XML-formaat");
 
-            
-
             $operation = (string) $xml->info->operation;
 
             if (isset($xml->companies->company)) {
-                $company = $xml->companies->company;
-                $this->handleCompany($company, $operation);
+                $this->handleCompany($xml->companies->company, $operation);
             }
 
             if (isset($xml->company_employee)) {
@@ -103,11 +106,11 @@ class CompanyConsumer {
             $msg->ack();
         } catch (Exception $e) {
             error_log("[ERROR] " . $e->getMessage());
-            $msg->ack(); // Vermijd eindeloze requeue
+            $msg->ack(); // Geen eindeloze retry loop
         }
     }
 
-    private function handleCompany(SimpleXMLElement $company, $operation) {
+    private function handleCompany(SimpleXMLElement $company, string $operation): void {
         $uid = (string) $company->uid;
         if (!$uid) throw new Exception("❌ uid ontbreekt bij company");
 
@@ -133,7 +136,6 @@ class CompanyConsumer {
                     :email, :phone, :owner_id
                 )
             ");
-            error_log("🏗️ Creëren van bedrijf $uid");
         } elseif ($operation === 'update') {
             if (!$exists) throw new Exception("❌ Bedrijf $uid bestaat niet");
 
@@ -155,7 +157,6 @@ class CompanyConsumer {
                     owner_id = :owner_id
                 WHERE uid = :uid
             ");
-            error_log("🔄 Updaten van bedrijf $uid");
         } elseif ($operation === 'delete') {
             $stmt = $this->db->prepare("DELETE FROM companies WHERE uid = :uid");
             $stmt->execute([':uid' => $uid]);
@@ -184,7 +185,7 @@ class CompanyConsumer {
         ]);
     }
 
-    private function handleCompanyEmployee(SimpleXMLElement $employee, string $employeeOperation) {
+    private function handleCompanyEmployee(SimpleXMLElement $employee, string $operation): void {
         $user_uid = (string) $employee->uid;
         $company_uid = (string) $employee->company_id;
 
@@ -192,16 +193,16 @@ class CompanyConsumer {
             throw new Exception("❌ Fout in company_employee: ontbrekende uid of company_id");
         }
 
-        if ($employeeOperation === 'register') {
+        if ($operation === 'register') {
             $this->updateUserMetaCompanyLink($user_uid, $company_uid);
-        } elseif ($employeeOperation === 'unregister') {
+        } elseif ($operation === 'unregister') {
             $this->updateUserMetaCompanyLink($user_uid, '');
         } else {
-            throw new Exception("❌ Ongeldige operatie voor user-company link: $employeeOperation");
+            throw new Exception("❌ Ongeldige operatie voor user-company link: $operation");
         }
     }
 
-    private function updateUserMetaCompanyLink(string $user_uid, string $company_uid) {
+    private function updateUserMetaCompanyLink(string $user_uid, string $company_uid): void {
         $stmt = $this->db->prepare("SELECT user_id FROM {$this->table_prefix}_usermeta WHERE meta_key = 'uid' AND meta_value = :uid LIMIT 1");
         $stmt->execute([':uid' => $user_uid]);
         $user_id = $stmt->fetchColumn();
@@ -217,7 +218,7 @@ class CompanyConsumer {
         error_log("🔗 Gebruiker $user_uid gelinkt aan bedrijf $company_uid");
     }
 
-    private function upsertUserMeta(int $user_id, string $meta_key, string $meta_value) {
+    private function upsertUserMeta(int $user_id, string $meta_key, string $meta_value): void {
         $stmt = $this->db->prepare("SELECT umeta_id FROM {$this->table_prefix}_usermeta WHERE user_id = :user_id AND meta_key = :meta_key");
         $stmt->execute([':user_id' => $user_id, ':meta_key' => $meta_key]);
 
@@ -232,7 +233,8 @@ class CompanyConsumer {
 }
 
 try {
-    new CompanyConsumer();
+    $consumer = new CompanyConsumer(); // geen connectie met queue of db in tests
+    $consumer->run();                  // expliciet starten
 } catch (Exception $e) {
     error_log("❌ CompanyConsumer kon niet starten: " . $e->getMessage());
     exit(1);
