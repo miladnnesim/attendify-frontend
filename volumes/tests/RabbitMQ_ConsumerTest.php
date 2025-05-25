@@ -62,7 +62,7 @@ XML;
             public function ack($multiple = false): void {}
         };
 
-        $this->consumer->handleMessage($msg, 'crm');
+        $this->consumer->handleMessage($msg, 'billing');
 
         $row = $this->pdo->query("SELECT * FROM wp_users WHERE user_email = 'test@example.com'")->fetch(PDO::FETCH_ASSOC);
         $this->assertNotEmpty($row);
