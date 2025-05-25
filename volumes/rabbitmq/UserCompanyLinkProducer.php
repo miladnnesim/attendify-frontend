@@ -11,6 +11,7 @@ use Exception;
 use DateTime;
 use SimpleXMLElement;
 use DOMDocument;
+use InvalidArgumentException;
 class UserCompanyLinkProducer {
     private $channel;
     private $connection;

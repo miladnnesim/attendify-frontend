@@ -1,10 +1,11 @@
 <?php
 namespace Tests;
-
 use App\UserCompanyLinkProducer;
 use PhpAmqpLib\Message\AMQPMessage;
 use PHPUnit\Framework\TestCase;
-
+use PhpAmqpLib\Channel\AMQPChannel;
+use Exception;
+use PDO;
 class UserCompanyLinkProducerTest extends TestCase
 {
     public function testSendRegisterPublishesCorrectMessage(): void
