@@ -3,7 +3,7 @@ namespace Tests;
 
 // Laad Composer-autoload (bootstrap laadt 'm alvast, dus dit is een no-op)
 use PHPUnit\Framework\TestCase;
-require_once __DIR__ . '../rabbitmq/Producer.php';
+require_once '/home/runner/work/attendify-frontend/attendify-frontend/volumes/rabbitmq/Producer.php';
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PDO;
