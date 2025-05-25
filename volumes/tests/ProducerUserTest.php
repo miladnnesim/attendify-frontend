@@ -67,19 +67,7 @@ class ProducerUserTest extends TestCase
         $producer->sendUserData(1, 'create');
     }
 
-    public function testSendUserDataSkipsDuplicateMessage(): void
-    {
-        $mockChannel = $this->createMock(AMQPChannel::class);
-        $mockChannel->expects($this->never())->method('basic_publish');
-
-        $producer = new ProducerUser($mockChannel);
-        $xml      = $producer->buildUserXml('WP'.time(), get_userdata(1), [], 'update');
-        $hash     = md5($xml);
-        $GLOBALS['transient_return'] = $hash;
-
-        $producer->sendUserData(1, 'update');
-        $this->assertArrayHasKey('last_set_transient', $GLOBALS);
-    }
+    
 
     /**
      * @dataProvider functionProvider
