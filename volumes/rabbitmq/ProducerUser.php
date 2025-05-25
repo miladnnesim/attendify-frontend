@@ -28,20 +28,23 @@ class ProducerUser {
     private $connection;
     private $exchange = 'user-management';
 
-    public function __construct(AMQPChannel $channel = null) {
-        if ($channel) {
-            $this->channel = $channel;
-        } else {
-            $this->connection = new AMQPStreamConnection(
-                'rabbitmq',
-                getenv('RABBITMQ_AMQP_PORT'),
-                getenv('RABBITMQ_HOST'),
-                getenv('RABBITMQ_PASSWORD'),
-                getenv('RABBITMQ_USER')
-            );
-            $this->channel = $this->connection->channel();
-        }
+   public function __construct(AMQPChannel $channel = null) {
+    if ($channel) {
+        // 🧪 Tijdens test, een gemockte channel gebruiken
+        $this->channel = $channel;
+    } else {
+        // 🔌 Enkel in productie een echte verbinding maken
+        $this->connection = new AMQPStreamConnection(
+            'rabbitmq',
+            getenv('RABBITMQ_AMQP_PORT') ?: 5672,
+            getenv('RABBITMQ_USER') ?: 'guest',
+            getenv('RABBITMQ_PASSWORD') ?: 'guest',
+            getenv('RABBITMQ_VHOST') ?: '/'
+        );
+        $this->channel = $this->connection->channel();
     }
+}
+
 
     public function sendUserData($user_id, $operation = 'create') {
         global $wpdb;
