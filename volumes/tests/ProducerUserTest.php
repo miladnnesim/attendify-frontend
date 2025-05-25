@@ -3,7 +3,7 @@ namespace Tests;
 
 // Laad Composer-autoload (bootstrap laadt 'm alvast, dus dit is een no-op)
 use PHPUnit\Framework\TestCase;
-use App\Producer;
+use App\ProducerUser;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PDO;
@@ -12,12 +12,12 @@ use Exception;
 use DateTime;
 use SimpleXMLElement;
 use DOMDocument;
-class ProducerTest extends TestCase
+class ProducerUserTest extends TestCase
 {
     public function testBuildUserXmlProducesExpectedStructure(): void
     {
         $mockChannel = $this->createMock(AMQPChannel::class);
-        $producer    = new Producer($mockChannel);
+        $producer    = new ProducerUser($mockChannel);
 
         $user = (object)[
             'user_email' => 'foo@bar.com',
@@ -61,7 +61,7 @@ class ProducerTest extends TestCase
                 'user.register'
             );
 
-        $producer = new Producer($mockChannel);
+        $producer = new ProducerUser($mockChannel);
         $producer->sendUserData(1, 'create');
     }
 
@@ -70,7 +70,7 @@ class ProducerTest extends TestCase
         $mockChannel = $this->createMock(AMQPChannel::class);
         $mockChannel->expects($this->never())->method('basic_publish');
 
-        $producer = new Producer($mockChannel);
+        $producer = new ProducerUser($mockChannel);
         $xml      = $producer->buildUserXml('WP'.time(), get_userdata(1), [], 'update');
         $hash     = md5($xml);
         $GLOBALS['transient_return'] = $hash;
@@ -89,7 +89,7 @@ class ProducerTest extends TestCase
             ->method('basic_publish')
             ->with($this->anything(), 'user-management', $expectedRoutingKey);
 
-        (new Producer($mockChannel))->sendUserData(2, $operation);
+        (new ProducerUser($mockChannel))->sendUserData(2, $operation);
     }
 
     public function functionProvider(): array
@@ -106,7 +106,7 @@ class ProducerTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage("Invalid operation: foo");
 
-        (new Producer($this->createMock(AMQPChannel::class)))->sendUserData(1, 'foo');
+        (new ProducerUser($this->createMock(AMQPChannel::class)))->sendUserData(1, 'foo');
     }
 
     public function testSendUserDataUserNotFoundThrows(): void
@@ -114,6 +114,6 @@ class ProducerTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage("User with ID 999 not found.");
 
-        (new Producer($this->createMock(AMQPChannel::class)))->sendUserData(999, 'create');
+        (new ProducerUser($this->createMock(AMQPChannel::class)))->sendUserData(999, 'create');
     }
 }

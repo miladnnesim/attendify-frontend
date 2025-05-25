@@ -8,7 +8,7 @@
  * @subpackage Twenty_Twenty_Five
  * @since Twenty Twenty-Five 1.0
  */
-require_once ABSPATH . '/rabbitmq/Producer.php';
+require_once ABSPATH . '/rabbitmq/ProducerUser.php';
 require_once ABSPATH . '/rabbitmq/RegistrationMessageProducer.php';
 
 

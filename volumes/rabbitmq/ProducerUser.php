@@ -21,7 +21,7 @@ use Exception;
 use DateTime;
 use SimpleXMLElement;
 use DOMDocument;
-class Producer {
+class ProducerUser {
     private $channel;
     private $connection;
     private $exchange = 'user-management';
@@ -217,6 +217,6 @@ class Producer {
 if (php_sapi_name() === 'cli') {
     $user_id = $argv[1] ?? 1;
     $operation = $argv[2] ?? 'create';
-    $producer = new Producer();
+    $producer = new ProducerUser();
     $producer->sendUserData($user_id, $operation);
 }
