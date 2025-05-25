@@ -6,6 +6,8 @@ use PHPUnit\Framework\TestCase;
 use App\ProducerUser;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Channel\AMQPChannel;
+use PhpAmqpLib\Connection\AMQPStreamConnection;
+
 use PDO;
 use PDOStatement;
 use Exception;
@@ -17,7 +19,7 @@ class ProducerUserTest extends TestCase
     public function testBuildUserXmlProducesExpectedStructure(): void
     {
         $mockChannel = $this->createMock(AMQPChannel::class);
-        $producer    = new ProducerUser($mockChannel);
+        $producer    = new ProducerUser($mockChannel); 
 
         $user = (object)[
             'user_email' => 'foo@bar.com',
