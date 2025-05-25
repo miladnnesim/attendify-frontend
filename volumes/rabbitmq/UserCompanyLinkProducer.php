@@ -1,50 +1,42 @@
 <?php
 namespace App;
-require_once __DIR__ . '/../vendor/autoload.php';
 
-use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Channel\AMQPChannel;
-use PDO;
-use PDOStatement;
-use Exception;
-use DateTime;
-use SimpleXMLElement;
-use DOMDocument;
 use InvalidArgumentException;
-class UserCompanyLinkProducer {
-    private $channel;
-    private $connection;
-    private $exchange = 'company';
+use DOMDocument;
+use SimpleXMLElement;
 
-    public function __construct(AMQPChannel $channel = null) {
-        if ($channel) {
-            // ➕ testbare channel via DI
-            $this->channel = $channel;
-        } else {
-            // 🔌 echte connectie
-            $this->connection = new AMQPStreamConnection(
-                'rabbitmq',
-                getenv('RABBITMQ_AMQP_PORT') ?: 5672,
-                getenv('RABBITMQ_HOST') ?: 'guest',
-                getenv('RABBITMQ_PASSWORD') ?: 'guest',
-                getenv('RABBITMQ_USER') ?: 'guest'
-            );
-            $this->channel = $this->connection->channel();
-        }
+class UserCompanyLinkProducer {
+    private AMQPChannel $channel;
+    private string $exchange = 'company';
+
+    /**
+     * Constructor expects a pre-configured AMQPChannel for testability and to avoid real network calls in tests.
+     */
+    public function __construct(AMQPChannel $channel) {
+        $this->channel = $channel;
     }
 
+    /**
+     * Send a company link/unlink message to RabbitMQ.
+     *
+     * @param string $user_uid
+     * @param string $company_uid
+     * @param string $operation 'register' or 'unregister'
+     * @throws InvalidArgumentException on unknown operation
+     */
     public function send(string $user_uid, string $company_uid, string $operation = 'register'): void {
-        // ✅ Routing key dynamisch bepalen op basis van operatie
+        // Determine routing key based on operation
         if ($operation === 'register') {
-            $routing_key = 'company.register';
+            $routingKey = 'company.register';
         } elseif ($operation === 'unregister') {
-            $routing_key = 'company.unregister';
+            $routingKey = 'company.unregister';
         } else {
             throw new InvalidArgumentException("Ongeldige operatie: $operation");
         }
 
-        // XML bericht bouwen
+        // Build XML message
         $xml = new SimpleXMLElement('<attendify/>');
         $info = $xml->addChild('info');
         $info->addChild('sender', 'frontend');
@@ -54,39 +46,49 @@ class UserCompanyLinkProducer {
         $employee->addChild('uid', $user_uid);
         $employee->addChild('company_id', $company_uid);
 
-        $dom = new DOMDocument('1.0');
+        // Pretty-format XML
+        $dom = new DOMDocument('1.0', 'UTF-8');
         $dom->preserveWhiteSpace = false;
         $dom->formatOutput = true;
         $dom->loadXML($xml->asXML());
-        $xml_string = $dom->saveXML();
+        $xmlString = $dom->saveXML();
 
-        $message = new AMQPMessage($xml_string, ['content_type' => 'text/xml']);
+        // Publish message
+        $message = new AMQPMessage($xmlString, ['content_type' => 'text/xml']);
+        $this->channel->basic_publish($message, $this->exchange, $routingKey);
 
-        $this->channel->basic_publish($message, $this->exchange, $routing_key);
-
-        error_log("✅ XML verzonden naar RabbitMQ voor user '{$user_uid}' met operatie '{$operation}' via routing '{$routing_key}'");
-    }
-
-    public function __destruct() {
-        if ($this->channel) {
-            $this->channel->close();
-        }
-        if ($this->connection) {
-            $this->connection->close();
-        }
+        error_log("✅ XML verzonden naar RabbitMQ voor user '{$user_uid}' met operatie '{$operation}' via routing '{$routingKey}'");
     }
 }
 
-// ❇️ Handige wrapper functie behouden (voor backward compatibility of WordPress gebruik)
-function sendUserCompanyLink($user_uid, $company_uid, $operation = 'register') {
-    $producer = new UserCompanyLinkProducer();
+/**
+ * Helper function for backward compatibility or simple CLI usage.
+ *
+ * Note: In tests, prefer injecting your own channel into UserCompanyLinkProducer.
+ */
+function sendUserCompanyLink(string $user_uid, string $company_uid, string $operation = 'register') {
+    // Create a real connection only in production
+    $connection = new AMQPStreamConnection(
+        'rabbitmq',
+        (int)(getenv('RABBITMQ_AMQP_PORT') ?: 5672),
+        getenv('RABBITMQ_HOST') ?: 'guest',
+        getenv('RABBITMQ_PASSWORD') ?: 'guest',
+        getenv('RABBITMQ_USER') ?: 'guest'
+    );
+    $channel = $connection->channel();
+
+    $producer = new UserCompanyLinkProducer($channel);
     $producer->send($user_uid, $company_uid, $operation);
+
+    // Close connections
+    $channel->close();
+    $connection->close();
 }
 
-// CLI test
-if (php_sapi_name() === 'cli') {
-    $user_uid = $argv[1] ?? 'u1';
+// CLI fallback
+if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
+    $user_uid    = $argv[1] ?? 'u1';
     $company_uid = $argv[2] ?? 'e5';
-    $operation = $argv[3] ?? 'register';
+    $operation   = $argv[3] ?? 'register';
     sendUserCompanyLink($user_uid, $company_uid, $operation);
 }
