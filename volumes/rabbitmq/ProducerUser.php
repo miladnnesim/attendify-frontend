@@ -3,7 +3,7 @@ namespace App;
 require_once __DIR__ . '/../vendor/autoload.php';
 
 // Load WordPress environment if not already loaded
-if (!function_exists('get_userdata')) {
+if (!defined('PHPUNIT_RUNNING')) {
     $wp_load_path = dirname(__DIR__) . '/wp-load.php';
     if (file_exists($wp_load_path)) {
         require_once $wp_load_path;
@@ -11,6 +11,8 @@ if (!function_exists('get_userdata')) {
         die("Error: Could not load WordPress environment. Ensure this script is run within a WordPress installation.\n");
     }
 }
+
+
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Channel\AMQPChannel;

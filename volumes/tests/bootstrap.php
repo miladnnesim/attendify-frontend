@@ -80,3 +80,4 @@ if (!function_exists('App\sendUserCompanyLink')) {
         error_log("Mock sendUserCompanyLink($uid, $vat, $operation)");
     }
 }
+define('PHPUNIT_RUNNING', true);
