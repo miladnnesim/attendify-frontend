@@ -10,6 +10,7 @@ use PDOStatement;
 use Exception;
 use DateTime;
 use SimpleXMLElement;
+
 class InvoiceConsumer {
     private $connection;
     private $channel;
@@ -50,15 +51,14 @@ class InvoiceConsumer {
 
         $this->verifyColumns('event_payments', ['uid', 'event_id', 'entrance_fee', 'entrance_paid', 'paid_at']);
 
-        // tab_sales
+        // tab_sales zonder unieke constraint
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS tab_sales (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 uid VARCHAR(30) NOT NULL,
                 event_id VARCHAR(30) NOT NULL,
                 timestamp DATETIME NOT NULL,
-                is_paid TINYINT(1) NOT NULL,
-                UNIQUE KEY unique_tab (uid, event_id)
+                is_paid TINYINT(1) NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -112,7 +112,6 @@ class InvoiceConsumer {
             $this->channel->wait();
         }
     }
-
 
     public function handleMessage(AMQPMessage $msg) {
         try {
@@ -201,13 +200,8 @@ class InvoiceConsumer {
 
         if (!$uid || !$event_id) throw new Exception("❌ uid of event_id ontbreekt bij tab");
 
-        $check = $this->db->prepare("SELECT id FROM tab_sales WHERE uid = :uid AND event_id = :event_id");
-        $check->execute([':uid' => $uid, ':event_id' => $event_id]);
-        $tab_id = $check->fetchColumn();
-
+        // Altijd nieuwe tab aanmaken bij "create" (geen check meer)
         if ($operation === 'create') {
-            if ($tab_id) throw new Exception("❌ Tab bestaat al voor ($uid, $event_id)");
-
             $insertTab = $this->db->prepare("
                 INSERT INTO tab_sales (uid, event_id, timestamp, is_paid)
                 VALUES (:uid, :event_id, :timestamp, :is_paid)
@@ -219,37 +213,39 @@ class InvoiceConsumer {
                 ':is_paid' => ((string) $tab->is_paid === 'true') ? 1 : 0
             ]);
             $tab_id = $this->db->lastInsertId();
-        } elseif ($operation === 'update') {
+        } elseif ($operation === 'update' || $operation === 'delete') {
+            // Vind meest recente tab voor deze user+event
+            $check = $this->db->prepare("SELECT id FROM tab_sales WHERE uid = :uid AND event_id = :event_id ORDER BY id DESC LIMIT 1");
+            $check->execute([':uid' => $uid, ':event_id' => $event_id]);
+            $tab_id = $check->fetchColumn();
+
             if (!$tab_id) {
-                error_log("❌ Geen bestaande tab voor update ($uid, $event_id)");
+                error_log("❌ Geen bestaande tab voor $operation ($uid, $event_id)");
                 return;
             }
 
-            $updateTab = $this->db->prepare("
-                UPDATE tab_sales
-                SET timestamp = :timestamp, is_paid = :is_paid
-                WHERE id = :id
-            ");
-            $updateTab->execute([
-                ':timestamp' => (string) $tab->timestamp,
-                ':is_paid' => ((string) $tab->is_paid === 'true') ? 1 : 0,
-                ':id' => $tab_id
-            ]);
-
-            $this->db->prepare("DELETE FROM tab_items WHERE tab_id = :tab_id")->execute([':tab_id' => $tab_id]);
-        } elseif ($operation === 'delete') {
-            if (!$tab_id) {
-                error_log("❌ Geen bestaande tab voor delete ($uid, $event_id)");
+            if ($operation === 'update') {
+                $updateTab = $this->db->prepare("
+                    UPDATE tab_sales
+                    SET timestamp = :timestamp, is_paid = :is_paid
+                    WHERE id = :id
+                ");
+                $updateTab->execute([
+                    ':timestamp' => (string) $tab->timestamp,
+                    ':is_paid' => ((string) $tab->is_paid === 'true') ? 1 : 0,
+                    ':id' => $tab_id
+                ]);
+                $this->db->prepare("DELETE FROM tab_items WHERE tab_id = :tab_id")->execute([':tab_id' => $tab_id]);
+            } elseif ($operation === 'delete') {
+                error_log("🔍 Deleting tab with id = $tab_id");
+                $this->db->prepare("DELETE FROM tab_sales WHERE id = :id")->execute([':id' => $tab_id]);
                 return;
             }
-            error_log("🔍 Deleting tab with id = $tab_id");
-            $this->db->prepare("DELETE FROM tab_sales WHERE id = :id")->execute([':id' => $tab_id]);
-            return;
         } else {
             throw new Exception("❌ Ongeldige operatie voor tab: $operation");
         }
 
-        if ($operation === 'create' || $operation === 'update') {
+        if (($operation === 'create' || $operation === 'update') && isset($tab_id)) {
             foreach ($tab->items->tab_item as $item) {
                 $insertItem = $this->db->prepare("
                     INSERT INTO tab_items (tab_id, item_name, quantity, price)

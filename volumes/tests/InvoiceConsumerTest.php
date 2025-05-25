@@ -25,13 +25,13 @@ class InvoiceConsumerTest extends TestCase {
             UNIQUE(uid, event_id)
         )");
 
+        // HIER GEEN UNIQUE CONSTRAINT MEER:
         $this->pdo->exec("CREATE TABLE tab_sales (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             uid TEXT NOT NULL,
             event_id TEXT NOT NULL,
             timestamp TEXT NOT NULL,
-            is_paid INTEGER NOT NULL,
-            UNIQUE(uid, event_id)
+            is_paid INTEGER NOT NULL
         )");
 
         $this->pdo->exec("CREATE TABLE tab_items (
@@ -74,11 +74,11 @@ XML;
         $this->assertEquals('2025-05-25 15:00:00', $row['paid_at']);
     }
 
-public function testHandleEventPaymentUpdate(): void {
-    $this->pdo->exec("INSERT INTO event_payments (uid, event_id, entrance_fee, entrance_paid, paid_at)
-                      VALUES ('user123', 'ev42', 10.0, 0, '2025-01-01 10:00:00')");
+    public function testHandleEventPaymentUpdate(): void {
+        $this->pdo->exec("INSERT INTO event_payments (uid, event_id, entrance_fee, entrance_paid, paid_at)
+                          VALUES ('user123', 'ev42', 10.0, 0, '2025-01-01 10:00:00')");
 
-    $xml = <<<XML
+        $xml = <<<XML
 <attendify>
   <info>
     <operation>update_event_payment</operation>
@@ -94,21 +94,22 @@ public function testHandleEventPaymentUpdate(): void {
 </attendify>
 XML;
 
-    $msg = new FakeAMQPMessage($xml);
-    $this->consumer->handleMessage($msg);
+        $msg = new FakeAMQPMessage($xml);
+        $this->consumer->handleMessage($msg);
 
-    $stmt = $this->pdo->query("SELECT * FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
-    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $stmt = $this->pdo->query("SELECT * FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-    $this->assertEquals(15.5, $row['entrance_fee']);
-    $this->assertEquals(1, $row['entrance_paid']);
-    $this->assertEquals('2025-06-01 12:00:00', $row['paid_at']);
-}
-public function testHandleEventPaymentDelete(): void {
-    $this->pdo->exec("INSERT INTO event_payments (uid, event_id, entrance_fee, entrance_paid, paid_at)
-                      VALUES ('user123', 'ev42', 10.0, 1, '2025-01-01 10:00:00')");
+        $this->assertEquals(15.5, $row['entrance_fee']);
+        $this->assertEquals(1, $row['entrance_paid']);
+        $this->assertEquals('2025-06-01 12:00:00', $row['paid_at']);
+    }
 
-    $xml = <<<XML
+    public function testHandleEventPaymentDelete(): void {
+        $this->pdo->exec("INSERT INTO event_payments (uid, event_id, entrance_fee, entrance_paid, paid_at)
+                          VALUES ('user123', 'ev42', 10.0, 1, '2025-01-01 10:00:00')");
+
+        $xml = <<<XML
 <attendify>
   <info>
     <operation>delete_event_payment</operation>
@@ -121,14 +122,15 @@ public function testHandleEventPaymentDelete(): void {
 </attendify>
 XML;
 
-    $msg = new FakeAMQPMessage($xml);
-    $this->consumer->handleMessage($msg);
+        $msg = new FakeAMQPMessage($xml);
+        $this->consumer->handleMessage($msg);
 
-    $stmt = $this->pdo->query("SELECT COUNT(*) FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
-    $this->assertEquals(0, $stmt->fetchColumn());
-}
-public function testHandleTabCreate(): void {
-    $xml = <<<XML
+        $stmt = $this->pdo->query("SELECT COUNT(*) FROM event_payments WHERE uid = 'user123' AND event_id = 'ev42'");
+        $this->assertEquals(0, $stmt->fetchColumn());
+    }
+
+    public function testHandleTabCreate(): void {
+        $xml = <<<XML
 <attendify>
   <info>
     <operation>create</operation>
@@ -150,23 +152,24 @@ public function testHandleTabCreate(): void {
 </attendify>
 XML;
 
-    $msg = new FakeAMQPMessage($xml);
-    $this->consumer->handleMessage($msg);
+        $msg = new FakeAMQPMessage($xml);
+        $this->consumer->handleMessage($msg);
 
-    $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE uid = 'u1' AND event_id = 'e99'")->fetch(\PDO::FETCH_ASSOC);
-    $this->assertNotEmpty($sale);
-    $this->assertEquals(1, $sale['is_paid']);
+        $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE uid = 'u1' AND event_id = 'e99'")->fetch(\PDO::FETCH_ASSOC);
+        $this->assertNotEmpty($sale);
+        $this->assertEquals(1, $sale['is_paid']);
 
-    $items = $this->pdo->query("SELECT * FROM tab_items WHERE tab_id = {$sale['id']}")->fetchAll(\PDO::FETCH_ASSOC);
-    $this->assertCount(1, $items);
-    $this->assertEquals('Cola', $items[0]['item_name']);
-}
-public function testHandleTabUpdate(): void {
-    // Eerst tab + item aanmaken
-    $this->pdo->exec("INSERT INTO tab_sales (id, uid, event_id, timestamp, is_paid) VALUES (1, 'u1', 'e99', '2025-01-01 10:00:00', 0)");
-    $this->pdo->exec("INSERT INTO tab_items (tab_id, item_name, quantity, price) VALUES (1, 'Cola', 1, 3.0)");
+        $items = $this->pdo->query("SELECT * FROM tab_items WHERE tab_id = {$sale['id']}")->fetchAll(\PDO::FETCH_ASSOC);
+        $this->assertCount(1, $items);
+        $this->assertEquals('Cola', $items[0]['item_name']);
+    }
 
-    $xml = <<<XML
+    public function testHandleTabUpdate(): void {
+        // Eerst tab + item aanmaken
+        $this->pdo->exec("INSERT INTO tab_sales (id, uid, event_id, timestamp, is_paid) VALUES (1, 'u1', 'e99', '2025-01-01 10:00:00', 0)");
+        $this->pdo->exec("INSERT INTO tab_items (tab_id, item_name, quantity, price) VALUES (1, 'Cola', 1, 3.0)");
+
+        $xml = <<<XML
 <attendify>
   <info>
     <operation>update</operation>
@@ -188,31 +191,32 @@ public function testHandleTabUpdate(): void {
 </attendify>
 XML;
 
-    $msg = new FakeAMQPMessage($xml);
-    $this->consumer->handleMessage($msg);
+        $msg = new FakeAMQPMessage($xml);
+        $this->consumer->handleMessage($msg);
 
-    $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE id = 1")->fetch(\PDO::FETCH_ASSOC);
-    $this->assertEquals(1, $sale['is_paid']);
-    $this->assertEquals('2025-05-25 18:00:00', $sale['timestamp']);
+        $sale = $this->pdo->query("SELECT * FROM tab_sales WHERE id = 1")->fetch(\PDO::FETCH_ASSOC);
+        $this->assertEquals(1, $sale['is_paid']);
+        $this->assertEquals('2025-05-25 18:00:00', $sale['timestamp']);
 
-    $items = $this->pdo->query("SELECT * FROM tab_items WHERE tab_id = 1")->fetchAll(\PDO::FETCH_ASSOC);
-    $this->assertCount(1, $items);
-    $this->assertEquals('Fanta', $items[0]['item_name']);
-}
-public function testHandleTabDelete(): void {
-    // 👇 Correcte insertie met uid + event_id
-    $this->pdo->exec("
-        INSERT INTO tab_sales (uid, event_id, timestamp, is_paid)
-        VALUES ('u1', 'e99', '2025-01-01 10:00:00', 0)
-    ");
-    $tab_id = $this->pdo->lastInsertId();
+        $items = $this->pdo->query("SELECT * FROM tab_items WHERE tab_id = 1")->fetchAll(\PDO::FETCH_ASSOC);
+        $this->assertCount(1, $items);
+        $this->assertEquals('Fanta', $items[0]['item_name']);
+    }
 
-    $this->pdo->exec("
-        INSERT INTO tab_items (tab_id, item_name, quantity, price)
-        VALUES ($tab_id, 'Cola', 1, 3.0)
-    ");
+    public function testHandleTabDelete(): void {
+        // 👇 Correcte insertie met uid + event_id
+        $this->pdo->exec("
+            INSERT INTO tab_sales (uid, event_id, timestamp, is_paid)
+            VALUES ('u1', 'e99', '2025-01-01 10:00:00', 0)
+        ");
+        $tab_id = $this->pdo->lastInsertId();
 
-    $xml = <<<XML
+        $this->pdo->exec("
+            INSERT INTO tab_items (tab_id, item_name, quantity, price)
+            VALUES ($tab_id, 'Cola', 1, 3.0)
+        ");
+
+        $xml = <<<XML
 <attendify>
   <info>
     <operation>delete</operation>
@@ -225,16 +229,17 @@ public function testHandleTabDelete(): void {
 </attendify>
 XML;
 
-    $msg = new FakeAMQPMessage($xml);
-    $this->consumer->handleMessage($msg);
+        $msg = new FakeAMQPMessage($xml);
+        $this->consumer->handleMessage($msg);
 
-    $countSales = $this->pdo->query("SELECT COUNT(*) FROM tab_sales WHERE id = $tab_id")->fetchColumn();
-    $this->assertEquals(0, $countSales);
+        $countSales = $this->pdo->query("SELECT COUNT(*) FROM tab_sales WHERE id = $tab_id")->fetchColumn();
+        $this->assertEquals(0, $countSales);
 
-    $countItems = $this->pdo->query("SELECT COUNT(*) FROM tab_items WHERE tab_id = $tab_id")->fetchColumn();
-    $this->assertEquals(0, $countItems);
+        $countItems = $this->pdo->query("SELECT COUNT(*) FROM tab_items WHERE tab_id = $tab_id")->fetchColumn();
+        $this->assertEquals(0, $countItems);
+    }
 }
-}
+
 class FakeAMQPMessage extends \PhpAmqpLib\Message\AMQPMessage {
     public function ack($multiple = false): void {
         // Ignorer ack pendant les tests
