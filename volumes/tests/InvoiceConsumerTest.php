@@ -226,7 +226,7 @@ XML;
 }
 }
 class FakeAMQPMessage extends \PhpAmqpLib\Message\AMQPMessage {
-    public function ack(): void {
+    public function ack($multiple = false): void {
         // Ignorer ack pendant les tests
     }
 }
