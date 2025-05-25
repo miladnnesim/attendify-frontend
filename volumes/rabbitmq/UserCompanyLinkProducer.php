@@ -54,6 +54,10 @@ class UserCompanyLinkProducer {
             error_log("[monitoring.log skipped]: $message");
             return;
         }
+        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+        // Tijdens unit tests: skip publish naar monitoring
+        return;
+    }
         $sender = "frontend-user-company-link-producer";
         $timestamp = date('c');
         $logXml = "<log>"

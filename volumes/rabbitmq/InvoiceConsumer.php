@@ -283,6 +283,10 @@ class InvoiceConsumer {
             error_log("[monitoring.log skipped]: $message");
             return;
         }
+        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+        // Tijdens unit tests: skip publish naar monitoring
+        return;
+    }
 
         $sender = "frontend-invoice-consumer";
         $timestamp = date('c');

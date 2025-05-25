@@ -335,7 +335,7 @@ class RabbitMQ_Consumer {
    
         return json_decode($response, true);
     }
-    
+
     private function updateUser(string $uid, SimpleXMLElement $userNode) {
         $checkQuery = "SELECT u.ID 
         FROM {$this->table_prefix}_users u
@@ -447,6 +447,10 @@ class RabbitMQ_Consumer {
             error_log("[monitoring.log skipped]: $message");
             return;
         }
+        if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
+        // Tijdens unit tests: skip publish naar monitoring
+        return;
+    }
         $sender = "frontend-user-consumer";
         $timestamp = date('c');
         $logXml = "<log>"
