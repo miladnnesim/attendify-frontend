@@ -97,13 +97,11 @@ class CompanyConsumer {
                 );
                 if (!in_array($col, $colNames)) {
                     $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
-                    error_log("ℹ️ [sqlite] Kolom '$col' toegevoegd aan 'companies'");
                 }
             } else {
                 $stmt = $this->db->query("SHOW COLUMNS FROM companies LIKE '$col'");
                 if ($stmt->rowCount() === 0) {
                     $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
-                    error_log("ℹ️ [mysql] Kolom '$col' toegevoegd aan 'companies'");
                 }
             }
         }
