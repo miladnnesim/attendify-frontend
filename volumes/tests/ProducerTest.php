@@ -1,16 +1,17 @@
 <?php
-// tests/ProducerTest.php
-
 namespace Tests;
 
 // Laad Composer-autoload (bootstrap laadt 'm alvast, dus dit is een no-op)
-require_once __DIR__ . '/../vendor/autoload.php';
-
 use PHPUnit\Framework\TestCase;
 use App\Producer;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Channel\AMQPChannel;
-
+use PDO;
+use PDOStatement;
+use Exception;
+use DateTime;
+use SimpleXMLElement;
+use DOMDocument;
 class ProducerTest extends TestCase
 {
     public function testBuildUserXmlProducesExpectedStructure(): void
