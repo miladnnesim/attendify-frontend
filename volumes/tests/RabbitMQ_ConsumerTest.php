@@ -14,6 +14,7 @@ class RabbitMQ_ConsumerTest extends TestCase
     {
         $this->pdo = new PDO('sqlite::memory:');
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->pdo->sqliteCreateFunction('NOW', fn() => date('Y-m-d H:i:s'));
 
         $this->pdo->exec("CREATE TABLE wp_users (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
