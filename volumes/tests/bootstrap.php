@@ -72,12 +72,5 @@ if (! $wpdb instanceof WPDB) {
     $wpdb = new WPDB();
 }
 
-// ⛔ Vermijd echte RabbitMQ-verbindingen in tests
-if (!function_exists('App\sendUserCompanyLink')) {
 
-    function sendUserCompanyLink($uid, $vat, $operation) {
-        // Mock-versie tijdens tests – geen RabbitMQ connectie
-        error_log("Mock sendUserCompanyLink($uid, $vat, $operation)");
-    }
-}
 define('PHPUNIT_RUNNING', true);
