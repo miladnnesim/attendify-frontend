@@ -199,8 +199,10 @@ XML;
     $this->assertEquals('Fanta', $items[0]['item_name']);
 }
 public function testHandleTabDelete(): void {
-    $this->pdo->exec("INSERT INTO tab_sales (id, uid, event_id, timestamp, is_paid) VALUES (1, 'u1', 'e99', '2025-01-01 10:00:00', 0)");
-    $this->pdo->exec("INSERT INTO tab_items (tab_id, item_name, quantity, price) VALUES (1, 'Cola', 1, 3.0)");
+$this->pdo->exec("INSERT INTO tab_sales (uid, event_id, timestamp, is_paid) VALUES ('u1', 'e99', '2025-01-01 10:00:00', 0)");
+$tab_id = $this->pdo->lastInsertId();
+$this->pdo->exec("INSERT INTO tab_items (tab_id, item_name, quantity, price) VALUES ($tab_id, 'Cola', 1, 3.0)");
+
 
     $xml = <<<XML
 <attendify>
@@ -218,11 +220,12 @@ XML;
     $msg = new FakeAMQPMessage($xml);
     $this->consumer->handleMessage($msg);
 
-    $count = $this->pdo->query("SELECT COUNT(*) FROM tab_sales WHERE id = 1")->fetchColumn();
+    $count = $this->pdo->query("SELECT COUNT(*) FROM tab_sales WHERE id = $tab_id")->fetchColumn();
     $this->assertEquals(0, $count);
 
-    $items = $this->pdo->query("SELECT COUNT(*) FROM tab_items WHERE tab_id = 1")->fetchColumn();
+    $items = $this->pdo->query("SELECT COUNT(*) FROM tab_items WHERE tab_id = $tab_id")->fetchColumn();
     $this->assertEquals(0, $items);
+
 }
 }
 class FakeAMQPMessage extends \PhpAmqpLib\Message\AMQPMessage {
