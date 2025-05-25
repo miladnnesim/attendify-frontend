@@ -70,8 +70,9 @@ class CompanyConsumer {
         ");
     }
 
+        $driver = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
         $columns = [
-            'uid' => 'VARCHAR(30) UNIQUE',
+            'uid' => $driver === 'sqlite' ? 'VARCHAR(30)' : 'VARCHAR(30) UNIQUE',
             'companyNumber' => 'VARCHAR(20)',
             'name' => 'VARCHAR(255)',
             'VATNumber' => 'VARCHAR(20)',
@@ -89,27 +90,25 @@ class CompanyConsumer {
         ];
 
         foreach ($columns as $col => $type) {
-        $driver = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
-
-        if ($driver === 'sqlite') {
-            // SQLite: haal kolomnamen uit PRAGMA table_info
-            $colNames = array_column(
-                $this->db->query("PRAGMA table_info(companies)")->fetchAll(\PDO::FETCH_ASSOC),
-                'name'
-            );
-            if (!in_array($col, $colNames)) {
-                $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
-                error_log("ℹ️ [sqlite] Kolom '$col' toegevoegd aan 'companies'");
-            }
-        } else {
-            // MySQL
-            $stmt = $this->db->query("SHOW COLUMNS FROM companies LIKE '$col'");
-            if ($stmt->rowCount() === 0) {
-                $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
-                error_log("ℹ️ [mysql] Kolom '$col' toegevoegd aan 'companies'");
+            if ($driver === 'sqlite') {
+                $colNames = array_column(
+                    $this->db->query("PRAGMA table_info(companies)")->fetchAll(\PDO::FETCH_ASSOC),
+                    'name'
+                );
+                if (!in_array($col, $colNames)) {
+                    $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
+                    error_log("ℹ️ [sqlite] Kolom '$col' toegevoegd aan 'companies'");
+                }
+            } else {
+                $stmt = $this->db->query("SHOW COLUMNS FROM companies LIKE '$col'");
+                if ($stmt->rowCount() === 0) {
+                    $this->db->exec("ALTER TABLE companies ADD COLUMN $col $type");
+                    error_log("ℹ️ [mysql] Kolom '$col' toegevoegd aan 'companies'");
+                }
             }
         }
-    }
+
+    
 
     }
 
