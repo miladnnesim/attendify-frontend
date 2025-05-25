@@ -72,7 +72,7 @@ class CompanyConsumerTest extends TestCase
   </companies>
 </attendify>
 XML;
-        $msg = new makeMockedMsg($xml);
+        $msg = $this->makeMockedMsg($xml);
         $this->consumer->handleMessage($msg);
 
         $row = $this->db
@@ -115,7 +115,8 @@ XML;
   </companies>
 </attendify>
 XML;
-        $this->consumer->handleMessage(new makeMockedMsg($xml));
+        $msg = $this->makeMockedMsg($xml);
+        $this->consumer->handleMessage($msg);
 
         $row = $this->db
             ->query("SELECT * FROM companies WHERE uid = 'C2'")
@@ -142,7 +143,8 @@ XML;
   </companies>
 </attendify>
 XML;
-        $this->consumer->handleMessage(new makeMockedMsg($xml));
+        $msg = $this->makeMockedMsg($xml);
+        $this->consumer->handleMessage($msg);
 
         $count = $this->db
             ->query("SELECT COUNT(*) FROM companies WHERE uid = 'C3'")
@@ -164,7 +166,8 @@ XML;
   <companies><company><uid>C4</uid></company></companies>
 </attendify>
 XML;
-        $this->consumer->handleMessage(new makeMockedMsg($xml));
+        $msg = $this->makeMockedMsg($xml);
+        $this->consumer->handleMessage($msg);
     }
 
     public function testHandleCompanyUpdateMissingThrows(): void
@@ -178,7 +181,8 @@ XML;
   <companies><company><uid>C5</uid></company></companies>
 </attendify>
 XML;
-        $this->consumer->handleMessage(new makeMockedMsg($xml));
+        $msg = $this->makeMockedMsg($xml);
+        $this->consumer->handleMessage($msg);
     }
 
     public function testHandleCompanyEmployeeRegisterAndUnregister(): void
@@ -199,7 +203,8 @@ XML;
   </company_employee>
 </attendify>
 XML;
-        $this->consumer->handleMessage(new makeMockedMsg($xmlReg));
+        $msgReg = $this->makeMockedMsg($xmlReg);
+        $this->consumer->handleMessage($msgReg);
 
         // check upsert: beide meta_keys bestaan nu
         $rows = $this->db->query("SELECT meta_key, meta_value FROM wp_usermeta WHERE user_id = 42")->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -216,7 +221,8 @@ XML;
   </company_employee>
 </attendify>
 XML;
-        $this->consumer->handleMessage(new makeMockedMsg($xmlUn));
+        $msgUn = $this->makeMockedMsg($xmlUn);
+        $this->consumer->handleMessage($msgUn);
 
         $rows2 = $this->db->query("SELECT meta_key, meta_value FROM wp_usermeta WHERE user_id = 42")->fetchAll(PDO::FETCH_KEY_PAIR);
         $this->assertSame('', $rows2['company_vat_number']);
