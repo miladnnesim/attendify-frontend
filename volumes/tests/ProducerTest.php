@@ -2,6 +2,8 @@
 // tests/ProducerTest.php
 
 namespace {
+    require_once __DIR__ . '/../vendor/autoload.php';
+
     // --- Global stubs voor WordPress-functies en $wpdb ---
     function get_userdata($id) {
         if ($id === 999) {
@@ -53,6 +55,7 @@ namespace {
 }
 
 namespace Tests {
+    require_once __DIR__ . '/../vendor/autoload.php';
     use PHPUnit\Framework\TestCase;
     use App\Producer;
     use PhpAmqpLib\Message\AMQPMessage;
