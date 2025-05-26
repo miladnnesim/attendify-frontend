@@ -163,8 +163,8 @@ endif;
 add_filter('um_account_page_default_tabs_hook', 'add_extra_info_tab', 100);
 function add_extra_info_tab($tabs) {
     $tabs[150]['extra_info'] = array(
-        'name' => 'Extra Informatie',
-        'title' => 'Extra Informatie', // Expliciet title toevoegen
+        'name' => 'Additional Information',
+        'title' => 'Additional Information', // Expliciet title toevoegen
         'icon' => 'um-faicon-info-circle',
         'custom' => true
     );
@@ -194,7 +194,7 @@ function um_account_content_hook_extra_info($output, $tab_id) {
 
     // Debug: Controleer of de velden correct worden opgehaald
     if (empty($form_fields) || !is_array($form_fields)) {
-        $output .= '<p>Fout: Geen velden gevonden in het registratieformulier. Controleer het formulier-ID.</p>';
+        $output .= '<p>Error: No fields found in the registration form. Please check the form ID.</p>';
         return $output;
     }
 
@@ -238,7 +238,7 @@ function um_account_content_hook_extra_info($output, $tab_id) {
 <div class="um-form">
     <?php
         if (!$fields_displayed) {
-            echo '<p>Geen bewerkbare velden gevonden in het registratieformulier.</p>';
+            echo '<p>No editable fields found in the registration form.</p>';
         } else {
             // Render de velden met UM's eigen functie
             foreach ($fields as $key => $data) {
@@ -559,44 +559,44 @@ function render_event_session_page() {
     $html = '';
 
     if (isset($_GET['registered'])) {
-        $html .= '<div class="notice notice-success"><p>Je bent succesvol geregistreerd voor een ' . esc_html($_GET['registered']) . '.</p></div>';
+        $html .= '<div class="notice notice-success"><p>You have successfully registered for a ' . esc_html($_GET['registered']) . '.</p></div>';
     } elseif (isset($_GET['unregistered'])) {
-        $html .= '<div class="notice notice-info"><p>Je registratie voor de ' . esc_html($_GET['unregistered']) . ' is geannuleerd.</p></div>';
+        $html .= '<div class="notice notice-info"><p>Your registration for the ' . esc_html($_GET['unregistered']) . ' has been cancelled.</p></div>';
     }
 
-    $is_logged_in = is_user_logged_in();
-    $current_user_id = $is_logged_in ? get_current_user_id() : null;
+    $is_logged_in     = is_user_logged_in();
+    $current_user_id  = $is_logged_in ? get_current_user_id() : null;
     $current_user_uid = $is_logged_in ? get_user_meta($current_user_id, 'uid', true) : null;
 
     global $wpdb;
     $events = $wpdb->get_results("SELECT * FROM wp_events ORDER BY start_date ASC");
 
     if (empty($events)) {
-        return "<p>Geen evenementen gevonden.</p>";
+        return "<p>No events found.</p>";
     }
 
     $html .= '<div class="event-list">';
     foreach ($events as $index => $event) {
         $html .= "<div class='event-block'>";
         $html .= "<h2>" . esc_html($event->title) . "</h2>";
-        $html .= "<p><strong>Toegang:</strong> €" . esc_html(number_format($event->entrance_fee, 2)) . "</p>";
-        $html .= "<p><strong>Locatie:</strong> " . esc_html($event->location) . "</p>";
-        $html .= "<p><strong>Datum:</strong> " . esc_html($event->start_date) . " tot " . esc_html($event->end_date) . "</p>";
+        $html .= "<p><strong>Entrance Fee:</strong> €" . esc_html(number_format($event->entrance_fee, 2)) . "</p>";
+        $html .= "<p><strong>Location:</strong> " . esc_html($event->location) . "</p>";
+        $html .= "<p><strong>Date:</strong> " . esc_html($event->start_date) . " to " . esc_html($event->end_date) . "</p>";
         $html .= "<p>" . esc_html($event->description) . "</p>";
-    
+
         $is_registered = false;
-    
+
         if ($is_logged_in) {
             $is_registered = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM user_event WHERE user_id = %s AND event_id = %s",
                 $current_user_uid,
                 $event->uid
             ));
-    
+
             if ($is_registered) {
-                $html .= "<p class='registered'>✅ Je bent al geregistreerd voor dit event.</p>";
-    
-                // Google Calendar knop
+                $html .= "<p class='registered'>You are already registered for this event.</p>";
+
+                // Google Calendar button
                 date_default_timezone_set('Europe/Brussels');
                 $start = date('Ymd\THis\Z', strtotime($event->start_date . ' ' . $event->start_time));
                 $end   = date('Ymd\THis\Z', strtotime($event->end_date   . ' ' . $event->end_time));
@@ -607,32 +607,27 @@ function render_event_session_page() {
                     'details'  => $event->description,
                     'location' => $event->location
                 ]);
-    
-                $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Voeg toe aan Google Calendar</a>';
-    
+
+                $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Add to Google Calendar</a>';
+
                 $html .= '<form method="POST" action="/unregisterevent">';
                 $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
-                $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
+                $html .= '<button type="submit" class="button small red">Cancel Registration</button>';
                 $html .= '</form>';
             } else {
                 $html .= '<form method="POST" action="/registerevent">';
                 $html .= '<input type="hidden" name="event_uid" value="' . esc_attr($event->uid) . '">';
-                $html .= '<button type="submit" class="button">Registreer voor event</button>';
+                $html .= '<button type="submit" class="button">Register for Event</button>';
                 $html .= '</form>';
             }
         } else {
-            $html .= '<button class="button disabled" disabled>Log in om te registreren</button>';
+            $html .= '<button class="button disabled" disabled>Log In to Register</button>';
         }
 
-    
-        
-
-    
-    
-        // Sessies
+        // Sessions
         $sessions = $wpdb->get_results($wpdb->prepare("SELECT * FROM wp_sessions WHERE event_uid = %s ORDER BY date ASC", $event->uid));
         if ($sessions) {
-            $html .= "<button class='toggle-button' onclick='toggleSessions(\"sessions_$index\")'>Toon/Verberg Sessies</button>";
+            $html .= "<button class='toggle-button' onclick='toggleSessions(\"sessions_$index\")'>Show/Hide Sessions</button>";
             $html .= "<div class='session-list' id='sessions_$index' style='display:none;'><ul>";
 
             foreach ($sessions as $session) {
@@ -645,9 +640,9 @@ function render_event_session_page() {
                 $html .= "<strong>" . esc_html($session->title) . "</strong><br>";
                 $html .= "<em>" . esc_html($session->date) . " (" . esc_html($session->start_time) . " - " . esc_html($session->end_time) . ")</em><br>";
                 $html .= "<p>" . esc_html($session->description) . "</p>";
-                $html .= "<p><strong>Locatie:</strong> " . esc_html($session->location) . "</p>";
-                $html .= "<p><strong>Spreker:</strong> " . esc_html($session->speaker_name) . "<br><em>" . esc_html($session->speaker_bio) . "</em></p>";
-                $html .= "<p><strong>Aantal deelnemers:</strong> " . esc_html($count) . " / " . esc_html($session->max_attendees) . "</p>";
+                $html .= "<p><strong>Location:</strong> " . esc_html($session->location) . "</p>";
+                $html .= "<p><strong>Speaker:</strong> " . esc_html($session->speaker_name) . "<br><em>" . esc_html($session->speaker_bio) . "</em></p>";
+                $html .= "<p><strong>Number of Attendees:</strong> " . esc_html($count) . " / " . esc_html($session->max_attendees) . "</p>";
 
                 if ($is_logged_in) {
                     $is_registered_session = $wpdb->get_var($wpdb->prepare(
@@ -657,10 +652,10 @@ function render_event_session_page() {
                     ));
 
                     if ($is_registered_session) {
-                        $html .= "<p class='registered'>✅ Je bent al geregistreerd voor deze sessie.</p>";
+                        $html .= "<p class='registered'>You are already registered for this session.</p>";
                         $html .= '<form method="POST" action="/unregisterevent">';
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
-                        $html .= '<button type="submit" class="button small red">Annuleer registratie</button>';
+                        $html .= '<button type="submit" class="button small red">Cancel Registration</button>';
                         $html .= '</form>';
                         date_default_timezone_set('Europe/Brussels');
                         $start = date('Ymd\THis\Z', strtotime($session->date . ' ' . $session->start_time));
@@ -672,21 +667,19 @@ function render_event_session_page() {
                             'location' => $session->location
                         ]);
 
-                        $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Voeg toe aan Google Calendar</a>';
+                        $html .= '<a href="' . esc_url($calendar_url) . '" target="_blank" class="button small" style="margin-bottom: 10px;">📅 Add to Google Calendar</a>';
 
                     } elseif ($is_registered) {
-                        // Alleen registreren voor sessie als je voor event geregistreerd bent
                         $html .= '<form method="POST" action="/registerevent">';
                         $html .= '<input type="hidden" name="session_uid" value="' . esc_attr($session->uid) . '">';
-                        $html .= '<button type="submit" class="button small">Registreer voor sessie</button>';
+                        $html .= '<button type="submit" class="button small">Register for Session</button>';
                         $html .= '</form>';
                     } else {
-                        // Niet mogelijk sessie te registreren zonder event
-                        $html .= '<button class="button small disabled" disabled>Registreer eerst voor het event</button>';
+                        $html .= '<button class="button small disabled" disabled>Please register for the event first</button>';
                     }
-                    
+
                 } else {
-                    $html .= '<button class="button small disabled" disabled>Log in om te registreren</button>';
+                    $html .= '<button class="button small disabled" disabled>Log In to Register</button>';
                 }
 
                 $html .= "</li>";
@@ -710,6 +703,7 @@ function render_event_session_page() {
 
     return $html;
 }
+
 
 
 function custom_button_styles() {
@@ -879,9 +873,9 @@ add_shortcode('event_session_list', 'render_event_session_page');
 
 function activate_account_shortcode() {
     if (isset($_GET['key']) && isset($_GET['login'])) {
-        $key = sanitize_text_field($_GET['key']);
+        $key   = sanitize_text_field($_GET['key']);
         $login = sanitize_text_field($_GET['login']);
-        $user = check_password_reset_key($key, $login);
+        $user  = check_password_reset_key($key, $login);
 
         ob_start();
         ?>
@@ -964,14 +958,14 @@ function activate_account_shortcode() {
 
         <?php
         if (is_wp_error($user)) {
-            echo '<div class="alert-error">De activatielink is ongeldig of verlopen.</div>';
+            echo '<div class="alert-error">The activation link is invalid or has expired.</div>';
         } elseif (isset($_POST['set_password'])) {
             $new_pass = $_POST['new_pass'];
-            $repeat = $_POST['new_pass_repeat'];
+            $repeat   = $_POST['new_pass_repeat'];
 
             if ($new_pass === $repeat) {
                 reset_password($user, $new_pass);
-                echo '<div class="alert-success">Wachtwoord succesvol ingesteld. <a href="/login">Log in</a></div>';
+                echo '<div class="alert-success">Password successfully set. <a href="/login">Log in</a></div>';
                 echo '<script>
                     const url = new URL(window.location.href);
                     url.searchParams.delete("key");
@@ -979,7 +973,7 @@ function activate_account_shortcode() {
                     window.history.replaceState({}, document.title, url.toString());
                 </script>';
             } else {
-                echo '<div class="alert-error">Wachtwoorden komen niet overeen.</div>';
+                echo '<div class="alert-error">Passwords do not match.</div>';
                 display_password_form($key, $login);
             }
         } else {
@@ -990,26 +984,26 @@ function activate_account_shortcode() {
         return ob_get_clean();
 
     } else {
-        return '<div class="alert-error">Geen activatiegegevens gevonden in de URL.</div>';
+        return '<div class="alert-error">No activation data found in the URL.</div>';
     }
 }
 
 function display_password_form($key, $login) {
     ?>
-    <h2>Kies een nieuw wachtwoord voor <strong><?php echo esc_html($login); ?></strong></h2>
+    <h2>Choose a new password for <strong><?php echo esc_html($login); ?></strong></h2>
     <form method="post">
-        <input type="hidden" name="rp_key" value="<?php echo esc_attr($key); ?>">
+        <input type="hidden" name="rp_key"   value="<?php echo esc_attr($key); ?>">
         <input type="hidden" name="rp_login" value="<?php echo esc_attr($login); ?>">
 
         <div class="form-group">
-            <label class="form-label" for="new_pass">Nieuw wachtwoord</label>
+            <label class="form-label" for="new_pass">New Password</label>
             <input class="form-control" type="password" name="new_pass" id="new_pass" required>
         </div>
         <div class="form-group">
-            <label class="form-label" for="new_pass_repeat">Herhaal wachtwoord</label>
+            <label class="form-label" for="new_pass_repeat">Repeat Password</label>
             <input class="form-control" type="password" name="new_pass_repeat" id="new_pass_repeat" required>
         </div>
-        <button type="submit" name="set_password" class="btn btn-primary">Wachtwoord instellen</button>
+        <button type="submit" name="set_password" class="btn btn-primary">Set Password</button>
     </form>
     <?php
 }
@@ -1049,18 +1043,18 @@ add_action('init', function () {
 function render_event_grid() {
     global $wpdb;
 
-    // --- FILTERS ophalen uit $_GET ---
-    $search = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
+    // --- Get filters from $_GET ---
+    $search       = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
     $price_filter = isset($_GET['price_range']) ? $_GET['price_range'] : [];
-    $date_filter = isset($_GET['date_filter']) ? sanitize_text_field($_GET['date_filter']) : '';
+    $date_filter  = isset($_GET['date_filter']) ? sanitize_text_field($_GET['date_filter']) : '';
 
-    // --- BASISQUERY ---
-    $query = "SELECT * FROM wp_events WHERE 1=1";
+    // --- Base query ---
+    $query  = "SELECT * FROM wp_events WHERE 1=1";
     $params = [];
 
     if ($search) {
-        $query .= " AND title LIKE %s";
-        $params[] = '%' . $wpdb->esc_like($search) . '%';
+        $query     .= " AND title LIKE %s";
+        $params[]   = '%' . $wpdb->esc_like($search) . '%';
     }
 
     if (!empty($price_filter)) {
@@ -1089,181 +1083,188 @@ function render_event_grid() {
         $query .= " AND start_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 1 MONTH)";
     }
 
-    $query .= " ORDER BY start_date ASC";
-    $events = $params ? $wpdb->get_results($wpdb->prepare($query, ...$params)) : $wpdb->get_results($query);
+    $query  .= " ORDER BY start_date ASC";
+    $events  = $params
+             ? $wpdb->get_results($wpdb->prepare($query, ...$params))
+             : $wpdb->get_results($query);
 
     ob_start();
     ?>
-        <style>
-        /* 1. Overall Container Layout */
+    <style>
+    /* 1. Overall Container Layout */
+    .event-grid-container {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        padding: 32px 48px;
+        box-sizing: border-box;
+        gap: 32px;
+    }
+
+    /* 2. Sidebar (filters) */
+    .event-sidebar {
+        flex: 0 0 260px;
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 20px;
+        border-radius: 8px;
+        position: sticky;
+        top: 20px;
+        align-self: flex-start;
+        box-sizing: border-box;
+    }
+
+    .filter-block {
+        margin-bottom: 28px;
+        padding-right: 5px;
+    }
+
+    .filter-block h4 {
+        font-size: 15px;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 4px;
+    }
+
+    .filter-block label {
+        display: block;
+        font-size: 14px;
+        margin-bottom: 6px;
+    }
+
+    .event-sidebar input[type="text"] {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        max-width: 100%;
+        padding: 8px;
+        font-size: 14px;
+        margin-bottom: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    /* 3. Main area */
+    .event-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .event-main h2 {
+        font-size: 22px;
+        margin-bottom: 16px;
+    }
+
+    /* 4. Grid of event cards */
+    .event-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 20px;
+    }
+
+    /* 5. Event card */
+    .event-card {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: box-shadow 0.2s ease;
+    }
+
+    .event-card:hover {
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .event-card h3 {
+        font-size: 17px;
+        margin-top: 0;
+        margin-bottom: 8px;
+    }
+
+    .event-card .meta {
+        font-size: 14px;
+        color: #555;
+        margin-bottom: 6px;
+    }
+
+    .event-card .price {
+        font-weight: bold;
+        margin: 10px 0;
+    }
+
+    .card-footer {
+        margin-top: auto;
+        padding-top: 12px;
+    }
+
+    .event-card .button {
+        display: inline-block;
+        padding: 8px 12px;
+        background-color: #0073aa;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .event-card .button:hover {
+        background-color: #005a8c;
+    }
+
+    /* 6. Mobile responsive */
+    @media (max-width: 768px) {
         .event-grid-container {
-            display: flex;
-            flex-wrap: wrap;
-            width: 100%;
-            padding: 32px 48px; /* Add left/right breathing room */
-            box-sizing: border-box;
-            padding: 0px;
-            gap: 32px;
-        }
-
-        /* 2. Sidebar (filters) */
-        .event-sidebar {
-            flex: 0 0 260px;
-            background: #fff;
-            border: 1px solid #ddd;
-            padding: 20px;
-            border-radius: 8px;
-            position: sticky;
-            top: 20px;
-            align-self: flex-start;
-            box-sizing: border-box;
-        }
-
-        .filter-block {
-            margin-bottom: 28px;
-            padding-right: 5px;
-        }
-
-        .filter-block h4 {
-            font-size: 15px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 4px;
-        }
-
-        .filter-block label {
-            display: block;
-            font-size: 14px;
-            margin-bottom: 6px;
-        }
-
-        .event-sidebar input[type="text"] {
-            display: block;
-            width: 100%;
-            box-sizing: border-box;
-            max-width: 100%;
-            padding: 8px;
-            font-size: 14px;
-            margin-bottom: 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
-
-        /* 3. Main area */
-        .event-main {
-            flex: 1;
-            display: flex;
             flex-direction: column;
-        }
-
-        .event-main h2 {
-            font-size: 22px;
-            margin-bottom: 16px;
-        }
-
-        /* 4. Grid of event cards */
-        .event-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 20px;
-        }
-
-        /* 5. Event card */
-        .event-card {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 6px;
             padding: 16px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            transition: box-shadow 0.2s ease;
         }
 
-        .event-card:hover {
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        .event-sidebar {
+            width: 100%;
+            position: static;
+            margin-bottom: 20px;
         }
-
-        .event-card h3 {
-            font-size: 17px;
-            margin-top: 0;
-            margin-bottom: 8px;
-        }
-
-        .event-card .meta {
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 6px;
-        }
-
-        .event-card .price {
-            font-weight: bold;
-            margin: 10px 0;
-        }
-
-        .card-footer {
-            margin-top: auto;
-            padding-top: 12px;
-        }
-
-        .event-card .button {
-            display: inline-block;
-            padding: 8px 12px;
-            background-color: #0073aa;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        .event-card .button:hover {
-            background-color: #005a8c;
-        }
-
-        /* 6. Mobile responsive */
-        @media (max-width: 768px) {
-            .event-grid-container {
-                flex-direction: column;
-                padding: 16px;
-            }
-
-            .event-sidebar {
-                width: 100%;
-                position: static;
-                margin-bottom: 20px;
-            }
-        }
-        </style>
-
-
+    }
+    </style>
 
     <form method="get">
     <div class="event-grid-container">
         <div class="event-sidebar">
             <div class="filter-block">
-                <h4>Zoek een event</h4>
-                <input type="text" name="search" placeholder="Titel..." value="<?php echo esc_attr($search); ?>" onchange="this.form.submit()">
+                <h4>Search for an event</h4>
+                <input type="text"
+                       name="search"
+                       placeholder="Title..."
+                       value="<?php echo esc_attr($search); ?>"
+                       onchange="this.form.submit()">
             </div>
             <div class="filter-block">
-                <h4>Prijsrange</h4>
+                <h4>Price range</h4>
                 <?php
-                $ranges = [ '5-10' => '€5–€10', '10-15' => '€10–€15', '15-20' => '€15–€20', '20+' => '€20+' ];
+                $ranges = [
+                    '5-10'  => '€5–€10',
+                    '10-15' => '€10–€15',
+                    '15-20' => '€15–€20',
+                    '20+'   => '€20+'
+                ];
                 foreach ($ranges as $key => $label) {
-                    $checked = in_array($key, (array)$price_filter) ? 'checked' : '';
+                    $checked = in_array($key, (array) $price_filter) ? 'checked' : '';
                     echo "<label><input type='checkbox' name='price_range[]' value='$key' $checked onchange='this.form.submit()'> $label</label>";
                 }
                 ?>
             </div>
             <div class="filter-block">
-                <h4>Datum</h4>
+                <h4>Date</h4>
                 <?php
                 $date_options = [
-                    '' => 'Alle',
-                    'today' => 'Vandaag',
-                    'week' => 'Deze week',
-                    'month' => 'Deze maand'
+                    ''      => 'All',
+                    'today' => 'Today',
+                    'week'  => 'This week',
+                    'month' => 'This month'
                 ];
                 foreach ($date_options as $key => $label) {
                     $checked = ($date_filter === $key) ? 'checked' : '';
@@ -1277,22 +1278,22 @@ function render_event_grid() {
             <div class="event-grid">
             <?php
             if (empty($events)) {
-                echo '<p>Geen evenementen gevonden.</p>';
+                echo '<p>No events found.</p>';
             } else {
                 foreach ($events as $event) {
-                    $title = esc_html($event->title);
+                    $title    = esc_html($event->title);
                     $location = esc_html($event->location);
-                    $start = esc_html($event->start_date);
-                    $end = esc_html($event->end_date);
-                    $price = number_format($event->entrance_fee, 2);
-                    $link = '/event-detail?uid=' . esc_attr($event->uid);
+                    $start    = esc_html($event->start_date);
+                    $end      = esc_html($event->end_date);
+                    $price    = number_format($event->entrance_fee, 2);
+                    $link     = '/event-detail?uid=' . esc_attr($event->uid);
 
                     echo "<div class='event-card'>";
                     echo "<h3>$title</h3>";
-                    echo "<div class='meta'>$start tot $end</div>";
+                    echo "<div class='meta'>$start to $end</div>";
                     echo "<div class='meta'>$location</div>";
                     echo "<div class='price'>€$price</div>";
-                    echo "<div class='card-footer'><a href='$link' class='button'>Meer info</a></div>";
+                    echo "<div class='card-footer'><a href='$link' class='button'>More info</a></div>";
                     echo "</div>";
                 }
             }
@@ -1307,21 +1308,27 @@ function render_event_grid() {
 add_shortcode('event_grid', 'render_event_grid');
 
 function render_event_detail_viewer() {
-    if (!isset($_GET['uid'])) return '<p>Geen event geselecteerd.</p>';
+    if (!isset($_GET['uid'])) {
+        return '<p>No event selected.</p>';
+    }
 
     global $wpdb;
-    $uid = sanitize_text_field($_GET['uid']);
+    $uid   = sanitize_text_field($_GET['uid']);
     $event = $wpdb->get_row($wpdb->prepare("SELECT * FROM wp_events WHERE uid = %s", $uid));
-    if (!$event) return '<p>Event niet gevonden.</p>';
+    if (!$event) {
+        return '<p>Event not found.</p>';
+    }
 
-    $is_logged_in = is_user_logged_in();
-    $user_id = $is_logged_in ? get_current_user_id() : null;
-    $user_uid = $is_logged_in ? get_user_meta($user_id, 'uid', true) : null;
-    $is_registered = $is_logged_in ? $wpdb->get_var($wpdb->prepare(
-        "SELECT COUNT(*) FROM user_event WHERE user_id = %s AND event_id = %s",
-        $user_uid,
-        $uid
-    )) : false;
+    $is_logged_in   = is_user_logged_in();
+    $user_id        = $is_logged_in ? get_current_user_id() : null;
+    $user_uid       = $is_logged_in ? get_user_meta($user_id, 'uid', true) : null;
+    $is_registered  = $is_logged_in
+        ? $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM user_event WHERE user_id = %s AND event_id = %s",
+            $user_uid,
+            $uid
+          ))
+        : false;
 
     ob_start();
     ?>
@@ -1391,7 +1398,6 @@ function render_event_detail_viewer() {
         display: inline-block;
         font-size: 14px;
         text-decoration: none;
-        
         color: #0073aa;
     }
     .back-link:hover {
@@ -1401,114 +1407,122 @@ function render_event_detail_viewer() {
         margin-top: 10px;
         display: inline-block;
         font-size: 20px;
-        text-decoration: none;
-        color: #0073aa;
         text-decoration: underline;
-
+        color: #0073aa;
     }
     .link:hover {
-        color:rgb(0, 44, 65);
+        color: rgb(0, 44, 65);
     }
     </style>
 
     <div class="event-detail-container">
-        <a href="/event-en-session" class="back-link">← Terug naar eventlijst</a>
+        <a href="/event-en-session" class="back-link">← Back to event list</a>
 
         <h2><?php echo esc_html($event->title); ?></h2>
 
         <div class="event-meta">
-            <p><strong>Datum & Tijd:</strong>
+            <p><strong>Date &amp; Time:</strong>
                 <?php
-                echo esc_html(date_i18n('d/m/Y H:i', strtotime("$event->start_date {$event->start_time}"))) . ' – ' .
-                     esc_html(date_i18n('d/m/Y H:i', strtotime("$event->end_date {$event->end_time}")));
+                echo esc_html(date_i18n('d/m/Y H:i', strtotime("$event->start_date {$event->start_time}")))
+                   . ' – '
+                   . esc_html(date_i18n('d/m/Y H:i', strtotime("$event->end_date {$event->end_time}")));
                 ?>
             </p>
-            <p><strong>Locatie:</strong> <?php echo esc_html($event->location); ?></p>
-            <p><strong>Toegang:</strong> €<?php echo number_format($event->entrance_fee, 2); ?></p>
+            <p><strong>Location:</strong> <?php echo esc_html($event->location); ?></p>
+            <p><strong>Entrance Fee:</strong> €<?php echo number_format($event->entrance_fee, 2); ?></p>
         </div>
 
         <p><?php echo esc_html($event->description); ?></p>
 
         <?php if ($is_logged_in): ?>
             <?php if ($is_registered): ?>
-                <p>Je bent al geregistreerd voor dit event.</p>
+                <p>You are already registered for this event.</p>
                 <div class="button-group">
                     <form method="POST" action="/unregisterevent" style="margin: 0;">
                         <input type="hidden" name="event_uid" value="<?php echo esc_attr($uid); ?>">
-                        <button type="submit" class="button red outline">Annuleer registratie</button>
+                        <button type="submit" class="button red outline">Cancel Registration</button>
                     </form>
                     <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
-                        'text' => $event->title,
-                        'dates' => date('Ymd\THis', strtotime("$event->start_date {$event->start_time}")) . '/' .
-                                   date('Ymd\THis', strtotime("$event->end_date {$event->end_time}")),
-                        'details' => $event->description,
+                        'text'     => $event->title,
+                        'dates'    => date('Ymd\THis', strtotime("$event->start_date {$event->start_time}"))
+                                     . '/'
+                                     . date('Ymd\THis', strtotime("$event->end_date {$event->end_time}")),
+                        'details'  => $event->description,
                         'location' => $event->location
-                    ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
-                    
-                    
+                    ])); ?>" target="_blank" class="button">Add to Google Calendar</a>
                 </div>
-              
                 <a href="https://calendar.google.com/calendar/u/0/r?cid=integrationfront@gmail.com"
-           target="_blank" class="link">Of abonneer je op de kalender voor alle evenementen en sessies</a>
+                   target="_blank" class="link">
+                   Or subscribe to the calendar for all events and sessions
+                </a>
             <?php else: ?>
                 <form method="POST" action="/registerevent">
                     <input type="hidden" name="event_uid" value="<?php echo esc_attr($uid); ?>">
-                    <button type="submit" class="button">Registreer voor event</button>
+                    <button type="submit" class="button">Register for Event</button>
                 </form>
             <?php endif; ?>
         <?php else: ?>
-            <p><em>Log in om je te registreren.</em></p>
+            <p><em>Log in to register.</em></p>
         <?php endif; ?>
 
-        <h3>Sessies</h3>
+        <h3>Sessions</h3>
 
         <?php
-        $sessions = $wpdb->get_results($wpdb->prepare("SELECT * FROM wp_sessions WHERE event_uid = %s ORDER BY date ASC", $uid));
+        $sessions = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM wp_sessions WHERE event_uid = %s ORDER BY date ASC",
+            $uid
+        ));
         foreach ($sessions as $session):
-            $is_session_registered = $is_logged_in ? $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM user_session WHERE user_id = %s AND session_id = %s",
-                $user_uid,
+            $is_session_registered = $is_logged_in
+                ? $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM user_session WHERE user_id = %s AND session_id = %s",
+                    $user_uid,
+                    $session->uid
+                  ))
+                : false;
+            $session_count = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM user_session WHERE session_id = %s",
                 $session->uid
-            )) : false;
-
-            $session_count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM user_session WHERE session_id = %s", $session->uid));
+            ));
         ?>
             <div class="session-block">
                 <strong><?php echo esc_html($session->title); ?></strong>
-                <p><strong>Datum:</strong> <?php echo esc_html($session->date); ?> <?php echo esc_html($session->start_time); ?>–<?php echo esc_html($session->end_time); ?></p>
-                <p><strong>Locatie:</strong> <?php echo esc_html($session->location); ?></p>
-                <p><strong>Spreker:</strong> <?php echo esc_html($session->speaker_name); ?></p>
+                <p><strong>Date:</strong> <?php echo esc_html($session->date); ?> <?php echo esc_html($session->start_time); ?>–<?php echo esc_html($session->end_time); ?></p>
+                <p><strong>Location:</strong> <?php echo esc_html($session->location); ?></p>
+                <p><strong>Speaker:</strong> <?php echo esc_html($session->speaker_name); ?></p>
                 <p><em><?php echo esc_html($session->speaker_bio); ?></em></p>
                 <p><?php echo esc_html($session->description); ?></p>
-                <p><strong>Aantal deelnemers:</strong> <?php echo esc_html($session_count); ?> / <?php echo esc_html($session->max_attendees); ?></p>
+                <p><strong>Number of Attendees:</strong> <?php echo esc_html($session_count); ?> / <?php echo esc_html($session->max_attendees); ?></p>
 
                 <?php if (!$is_logged_in): ?>
-                    <p><em>Log in om je te registreren voor sessies.</em></p>
+                    <p><em>Log in to register for sessions.</em></p>
                 <?php elseif (!$is_registered): ?>
-                    <p><em>Registreer eerst voor het event om sessies te kunnen bijwonen.</em></p>
+                    <p><em>Please register for the event first to attend sessions.</em></p>
                 <?php elseif ($is_session_registered): ?>
                     <div class="button-group">
                         <form method="POST" action="/unregisterevent" style="margin: 0;">
                             <input type="hidden" name="session_uid" value="<?php echo esc_attr($session->uid); ?>">
-                            <button type="submit" class="button red outline">Annuleer registratie</button>
+                            <button type="submit" class="button red outline">Cancel Registration</button>
                         </form>
                         <a href="<?php echo esc_url('https://calendar.google.com/calendar/u/0/r/eventedit?' . http_build_query([
-                            'text' => $session->title,
-                            'dates' => date('Ymd\THis', strtotime($session->date . ' ' . $session->start_time)) . '/' .
-                                       date('Ymd\THis', strtotime($session->date . ' ' . $session->end_time)),
-                            'details' => $session->description,
+                            'text'     => $session->title,
+                            'dates'    => date('Ymd\THis', strtotime($session->date . ' ' . $session->start_time))
+                                         . '/'
+                                         . date('Ymd\THis', strtotime($session->date . ' ' . $session->end_time)),
+                            'details'  => $session->description,
                             'location' => $session->location,
-                            'ctz' => 'Europe/Brussels'
-                        ])); ?>" target="_blank" class="button">Voeg toe aan Google Calendar</a>
+                            'ctz'      => 'Europe/Brussels'
+                        ])); ?>" target="_blank" class="button">Add to Google Calendar</a>
                     </div>
                 <?php else: ?>
                     <form method="POST" action="/registerevent">
                         <input type="hidden" name="session_uid" value="<?php echo esc_attr($session->uid); ?>">
-                        <button type="submit" class="button">Registreer voor sessie</button>
+                        <button type="submit" class="button">Register for Session</button>
                     </form>
                 <?php endif; ?>
             </div>
         <?php endforeach; ?>
+
     </div>
 
     <?php
