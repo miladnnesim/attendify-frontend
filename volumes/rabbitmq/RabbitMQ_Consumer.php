@@ -179,7 +179,7 @@ class RabbitMQ_Consumer {
 
         $hashed_activation_key = null;
 
-        if ($sender == 'CRM' || $sender == 'Odoo'|| $sender == 'crm'|| $sender == 'odoo') {
+        if ($sender == 'CRM' || $sender == 'Odoo'|| $sender == 'crm'|| $sender == 'odoo'|| $sender == 'pos'|| $sender == 'POS'|| $sender == 'Pos'|| $sender == 'Odoo'|| $sender == 'Crm') {
             $wp_host = rtrim(getenv('WORDPRESS_HOST'), '/');
             $api_url = "http://wordpress:80/?rest_route=/myapiv2/set-activation-key";
             $this->sendMonitoringLog("API URL: " . $api_url, "info");
