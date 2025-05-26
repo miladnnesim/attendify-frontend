@@ -881,6 +881,7 @@ function activate_account_shortcode() {
     if (isset($_GET['key']) && isset($_GET['login'])) {
         $key = sanitize_text_field($_GET['key']);
         $login = sanitize_text_field($_GET['login']);
+        $user = check_password_reset_key($key, $login);
 
         ob_start();
         ?>
@@ -960,47 +961,61 @@ function activate_account_shortcode() {
         </style>
 
         <div class="crf-form">
-            <h2>Choose a new password for <strong><?php echo esc_html($login); ?></strong></h2>
-            <form method="post">
-                <input type="hidden" name="rp_key" value="<?php echo esc_attr($key); ?>">
-                <input type="hidden" name="rp_login" value="<?php echo esc_attr($login); ?>">
-
-                <div class="form-group">
-                    <label class="form-label" for="new_pass">New password</label>
-                    <input class="form-control" type="password" name="new_pass" id="new_pass" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="new_pass_repeat">Repeat password</label>
-                    <input class="form-control" type="password" name="new_pass_repeat" id="new_pass_repeat" required>
-                </div>
-                <button type="submit" name="set_password" class="btn btn-primary">Set Password</button>
-            </form>
 
         <?php
-        if (isset($_POST['set_password'])) {
-            $user = check_password_reset_key($key, $login);
-            if (!is_wp_error($user)) {
-                $new_pass = $_POST['new_pass'];
-                $repeat = $_POST['new_pass_repeat'];
+        if (is_wp_error($user)) {
+            echo '<div class="alert-error">De activatielink is ongeldig of verlopen.</div>';
+        } elseif (isset($_POST['set_password'])) {
+            $new_pass = $_POST['new_pass'];
+            $repeat = $_POST['new_pass_repeat'];
 
-                if ($new_pass === $repeat) {
-                    reset_password($user, $new_pass);
-                    echo '<div class="alert-success">Password successfully set. <a href="' . wp_login_url() . '">Log in</a></div>';
-                } else {
-                    echo '<div class="alert-error">Passwords do not match.</div>';
-                }
+            if ($new_pass === $repeat) {
+                reset_password($user, $new_pass);
+                echo '<div class="alert-success">Wachtwoord succesvol ingesteld. <a href="/login">Log in</a></div>';
+                echo '<script>
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete("key");
+                    url.searchParams.delete("login");
+                    window.history.replaceState({}, document.title, url.toString());
+                </script>';
             } else {
-                echo '<div class="alert-error">Invalid or expired activation link.</div>';
+                echo '<div class="alert-error">Wachtwoorden komen niet overeen.</div>';
+                display_password_form($key, $login);
             }
+        } else {
+            display_password_form($key, $login);
         }
-        echo '</div>'; // .crf-form
 
+        echo '</div>';
         return ob_get_clean();
+
     } else {
-        return '<div class="alert-error">No activation information found in the URL.</div>';
+        return '<div class="alert-error">Geen activatiegegevens gevonden in de URL.</div>';
     }
 }
+
+function display_password_form($key, $login) {
+    ?>
+    <h2>Kies een nieuw wachtwoord voor <strong><?php echo esc_html($login); ?></strong></h2>
+    <form method="post">
+        <input type="hidden" name="rp_key" value="<?php echo esc_attr($key); ?>">
+        <input type="hidden" name="rp_login" value="<?php echo esc_attr($login); ?>">
+
+        <div class="form-group">
+            <label class="form-label" for="new_pass">Nieuw wachtwoord</label>
+            <input class="form-control" type="password" name="new_pass" id="new_pass" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="new_pass_repeat">Herhaal wachtwoord</label>
+            <input class="form-control" type="password" name="new_pass_repeat" id="new_pass_repeat" required>
+        </div>
+        <button type="submit" name="set_password" class="btn btn-primary">Wachtwoord instellen</button>
+    </form>
+    <?php
+}
+
 add_shortcode('activate_account', 'activate_account_shortcode');
+
 
 
 add_action('init', function () {
