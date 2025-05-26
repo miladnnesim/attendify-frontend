@@ -102,6 +102,7 @@ class CompanyProducer {
         if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING) {
         // Tijdens unit tests: skip publish naar monitoring
         return;
+        
     }
         $sender = "frontend-company-producer";
         $timestamp = date('c');
