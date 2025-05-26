@@ -46,6 +46,8 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=${LOCAL_DB_PASSWORD}
       - MYSQL_DATABASE=${LOCAL_DB_NAME}
+      - MYSQL_USER=${LOCAL_DB_USER}
+      - MYSQL_PASSWORD=${LOCAL_DB_PASSWORD}
     volumes:
       - ./volumes/.docker/mysql-data:/var/lib/mysql
     networks:

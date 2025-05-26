@@ -28,7 +28,7 @@ class UnifiedConsumerEventSession {
     private function connectToDB(): PDO {
         try {
             $dsn = "mysql:host=db;dbname=wordpress;charset=utf8mb4";
-            $pdo = new PDO($dsn, getenv('LOCAL_DB_USER') ?: 'root', getenv('LOCAL_DB_PASSWORD') ?: 'root');
+            $pdo = new PDO($dsn, getenv('LOCAL_DB_USER'), getenv('LOCAL_DB_PASSWORD')) ;
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->sendMonitoringLog("✅ Connected to database", "info");
             error_log("✅ Connected to database");
